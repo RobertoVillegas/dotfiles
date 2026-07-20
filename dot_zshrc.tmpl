@@ -1,0 +1,77 @@
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME=""
+plugins=(git)
+[[ -r "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
+
+# Pure prompt, installed by Homebrew.
+if command -v brew >/dev/null 2>&1; then
+  fpath=("$(brew --prefix)/share/zsh/site-functions" $fpath)
+fi
+autoload -Uz promptinit && promptinit
+prompt pure 2>/dev/null || true
+
+# Package manager homes.
+export PNPM_HOME="${PNPM_HOME:-$HOME/Library/pnpm}"
+[[ -d "$PNPM_HOME" ]] && export PATH="$PNPM_HOME:$PATH"
+export BUN_INSTALL="$HOME/.bun"
+[[ -d "$BUN_INSTALL/bin" ]] && export PATH="$BUN_INSTALL/bin:$PATH"
+[[ -d "$HOME/go/bin" ]] && export PATH="$HOME/go/bin:$PATH"
+
+# Homebrew libraries used by local builds.
+if command -v brew >/dev/null 2>&1; then
+  brew_prefix="$(brew --prefix)"
+  for keg in libpq; do
+    [[ -d "$brew_prefix/opt/$keg/bin" ]] && export PATH="$brew_prefix/opt/$keg/bin:$PATH"
+  done
+  unset brew_prefix keg
+fi
+
+command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
+
+if command -v brew >/dev/null 2>&1; then
+  fzf_prefix="$(brew --prefix)/opt/fzf/shell"
+  [[ -r "$fzf_prefix/completion.zsh" ]] && source "$fzf_prefix/completion.zsh"
+  [[ -r "$fzf_prefix/key-bindings.zsh" ]] && source "$fzf_prefix/key-bindings.zsh"
+  unset fzf_prefix
+fi
+
+{{ if eq .chezmoi.os "darwin" -}}
+export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+[[ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ]] && alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+{{ end -}}
+
+alias ls="eza"
+alias ll="eza -l -g --git"
+alias llt="eza -1 --icons --tree --git-ignore"
+alias cat="bat"
+alias ga="git add -A"
+alias gc="git commit -m"
+alias gp="git push"
+alias gl="git log --oneline --graph --decorate -20"
+alias gco="git checkout"
+alias gst="git status -sb"
+
+[[ -r "$HOME/.local/bin/env" ]] && source "$HOME/.local/bin/env"
+
+_uv_comp="$HOME/.cache/uv-completions.zsh"
+if command -v uv >/dev/null 2>&1; then
+  if [[ ! -f "$_uv_comp" || "$(command -v uv)" -nt "$_uv_comp" ]]; then
+    mkdir -p "$HOME/.cache"
+    { uv generate-shell-completion zsh; uvx --generate-shell-completion zsh; } >| "$_uv_comp"
+  fi
+  source "$_uv_comp"
+fi
+unset _uv_comp
+
+[[ -r "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
+
+brewm() {
+  brew update || return 1
+  brew upgrade
+  {{ if eq .chezmoi.os "darwin" -}}brew upgrade --cask --greedy{{ end }}
+  brew cleanup
+  brew autoremove
+}
+
+export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$PATH"
+typeset -U path PATH

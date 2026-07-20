@@ -1,0 +1,3 @@
+keybind = shift+enter=text:\n
+scrollback-limit = 100000000
+theme = dark:Catppuccin Frappe,light:Rose Pine Dawn

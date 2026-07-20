@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+profile="dev"
+personal="false"
+editor="zed"
+container="orbstack"
+repo="RobertoVillegas/dotfiles"
+
+usage() {
+  cat <<'EOF'
+Usage: bootstrap [options]
+
+  --dev                  Install the development profile (default)
+  --minimal              Install only the portable core
+  --personal             Add personal applications
+  --editor=zed|vscode|both|none
+  --container=orbstack|none
+  --repo=OWNER/REPO      Override the chezmoi repository
+  -h, --help             Show this help
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --dev) profile="dev" ;;
+    --minimal) profile="minimal" ;;
+    --personal) personal="true" ;;
+    --editor=*) editor="${1#*=}" ;;
+    --container=*) container="${1#*=}" ;;
+    --repo=*) repo="${1#*=}" ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+  shift
+done
+
+case "$editor" in zed|vscode|both|none) ;; *) echo "Invalid editor: $editor" >&2; exit 2 ;; esac
+case "$container" in orbstack|none) ;; *) echo "Invalid container runtime: $container" >&2; exit 2 ;; esac
+
+export DOTFILES_PROFILE="$profile"
+export DOTFILES_PERSONAL="$personal"
+export DOTFILES_EDITOR="$editor"
+export DOTFILES_CONTAINER="$container"
+
+if ! command -v chezmoi >/dev/null 2>&1; then
+  bin_dir="$HOME/.local/bin"
+  mkdir -p "$bin_dir"
+  sh -c "$(curl -fsLS https://get.chezmoi.io)" -- -b "$bin_dir"
+  export PATH="$bin_dir:$PATH"
+fi
+
+script_dir=""
+if [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]}" ]]; then
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
+if [[ -n "$script_dir" && -d "$script_dir/.git" ]]; then
+  chezmoi --source "$script_dir" init --apply
+else
+  chezmoi init --apply "$repo"
+fi
+
+echo
+echo "Dotfiles applied: profile=$profile editor=$editor container=$container personal=$personal"
+echo "Restart the shell with: exec zsh -l"

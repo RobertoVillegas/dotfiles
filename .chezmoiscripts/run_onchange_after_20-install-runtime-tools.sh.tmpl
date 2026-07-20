@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PROTO_HOME="${PROTO_HOME:-$HOME/.proto}"
+export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
+
+proto install
+
+{{- if eq .profile "dev" }}
+
+npm install --global \
+  @earendil-works/pi-coding-agent \
+  @fission-ai/openspec \
+  @google/gemini-cli \
+  @openai/codex \
+  bash-language-server \
+  pyright \
+  typescript \
+  typescript-language-server
+
+if ! command -v claude >/dev/null 2>&1; then
+  curl -fsSL https://claude.ai/install.sh | bash
+fi
+{{- end }}

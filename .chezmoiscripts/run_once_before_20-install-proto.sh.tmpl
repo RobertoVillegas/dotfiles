@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PROTO_HOME="${PROTO_HOME:-$HOME/.proto}"
+if [[ -x "$PROTO_HOME/bin/proto" ]]; then
+  exit 0
+fi
+
+echo "Installing proto..."
+curl -fsSL https://moonrepo.dev/install/proto.sh | bash

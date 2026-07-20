@@ -1,0 +1,7 @@
+[
+  {
+    "key": "ctrl+cmd+space",
+    "command": "docs.write",
+    "when": "editorTextFocus"
+  }
+]

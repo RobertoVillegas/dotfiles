@@ -1,0 +1,14 @@
+onboarding = false
+
+[ui]
+agent_panel_scope = "all"
+show_agent_labels_on_pane_borders = true
+
+[theme]
+name = "catppuccin"
+auto_switch = true
+light_name = "catppuccin-latte"
+dark_name = "catppuccin"
+
+[ui.toast]
+delivery = "herdr"

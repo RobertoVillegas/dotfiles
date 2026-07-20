@@ -1,0 +1,5 @@
+export PROTO_HOME="$HOME/.proto"
+export npm_config_prefix="$PROTO_HOME/tools/node/globals"
+export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$HOME/.local/bin:$PATH"
+
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"

@@ -1,0 +1,14 @@
+{{- $profile := env "DOTFILES_PROFILE" | default "dev" -}}
+{{- $editor := env "DOTFILES_EDITOR" | default "zed" -}}
+{{- $container := env "DOTFILES_CONTAINER" | default "orbstack" -}}
+[data]
+profile = {{ $profile | quote }}
+editor = {{ $editor | quote }}
+container = {{ $container | quote }}
+personal = {{ eq (env "DOTFILES_PERSONAL") "true" }}
+gitName = {{ env "DOTFILES_GIT_NAME" | quote }}
+gitEmail = {{ env "DOTFILES_GIT_EMAIL" | quote }}
+
+[git]
+autoCommit = false
+autoPush = false

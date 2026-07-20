@@ -1,0 +1,16 @@
+README.md
+LICENSE
+bootstrap
+
+{{ if or (ne .chezmoi.os "darwin") (ne .profile "dev") (and (ne .editor "vscode") (ne .editor "both")) }}
+Library/Application Support/Code/User
+{{ end }}
+
+{{ if or (ne .profile "dev") (and (ne .editor "zed") (ne .editor "both")) }}
+.config/zed
+{{ end }}
+
+{{ if ne .profile "dev" }}
+.config/ghostty
+.config/herdr
+{{ end }}

@@ -124,45 +124,25 @@ Put the machine-specific Git identity and signing configuration in
     gpgsign = true
 ```
 
-## Restricted GitHub CLI tokens
+## GitHub CLI OAuth on a headless macOS host
 
-Create a fine-grained token limited to the required repositories. Typical
-permissions are Metadata read, Contents read, Pull requests write, Issues
-write when needed, and Actions read. Do not grant Administration, Secrets,
-Variables, Workflows, Webhooks, Environments, or organization administration.
+Git uses the dedicated SSH key for clone, fetch, pull, and push. GitHub CLI uses
+OAuth for API operations such as pull requests, issues, and Actions.
 
-Interactive macOS login Keychains are isolated from SSH audit sessions, so a
-headless agent cannot reliably retrieve a token from the login Keychain. Store
-each token in a private directory that is never managed by chezmoi or committed:
-
-```zsh
-install -d -m 700 "$HOME/.config/gh-tokens"
-read -s "GH_TOKEN?Paste the restricted token: "
-echo
-(umask 077; printf '%s' "$GH_TOKEN" > "$HOME/.config/gh-tokens/personal")
-unset GH_TOKEN
-```
-
-The devbox `~/.local/bin/gh` wrapper reads only one token for each invocation
-rather than exporting it to every child process. It selects automatically from
-the GitHub owner in `GH_REPO`, a `--repo`/`-R` argument, or the current
-repository's `origin` remote. Owner-to-token mappings live only in the private,
-unmanaged `~/.config/gh-tokens/owners` file. Configure entries with:
+An OAuth credential stored in the macOS login Keychain may be available to the
+local graphical login session but unavailable to a separate SSH audit session.
+After the normal browser login, refresh it into GitHub CLI's headless storage:
 
 ```sh
-git config --file "$HOME/.config/gh-tokens/owners" owner.ORGANIZATION.token organization
+gh auth login --hostname github.com --git-protocol ssh --skip-ssh-key --web
+gh auth refresh --hostname github.com --reset-scopes --insecure-storage
+chmod 600 "$HOME/.config/gh/hosts.yml"
 ```
 
-Keep organization-specific Git emails and conditional includes in the
-unmanaged `~/.gitconfig.local`. To override token selection for one invocation:
-
-```sh
-GH_TOKEN_FILE="$HOME/.config/gh-tokens/organization" gh pr list
-```
-
-FileVault protects these files at rest on macOS. Their directory and file modes
-limit access to the devbox account while it is running. Never add this directory
-to the chezmoi source state or any repository.
+The resulting default OAuth scopes are `repo`, `read:org`, and `gist`. The
+credential file is private to the devbox account and must never be managed by
+chezmoi or committed. Keep organization-specific Git email conditions in the
+unmanaged `~/.gitconfig.local`.
 
 ## Services
 

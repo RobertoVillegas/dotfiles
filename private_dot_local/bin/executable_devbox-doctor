@@ -78,21 +78,21 @@ else
   warn "Git SSH signing is not fully configured"
 fi
 
-token_dir="$HOME/.config/gh-tokens"
-tokens_found=0
-for token_file in "$token_dir"/*; do
-  [ -f "$token_file" ] || continue
-  [ "$(basename "$token_file")" = "owners" ] && continue
-  tokens_found=$((tokens_found + 1))
-  token_mode="$(stat -f '%Lp' "$token_file" 2>/dev/null || stat -c '%a' "$token_file" 2>/dev/null || true)"
-  if [ "$token_mode" = "600" ]; then
-    pass "Restricted GitHub token $(basename "$token_file") exists with mode 600"
+if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
+  pass "GitHub CLI OAuth is authenticated"
+  gh_hosts="$HOME/.config/gh/hosts.yml"
+  if [ -f "$gh_hosts" ]; then
+    gh_hosts_mode="$(stat -f '%Lp' "$gh_hosts" 2>/dev/null || stat -c '%a' "$gh_hosts" 2>/dev/null || true)"
+    if [ "$gh_hosts_mode" = "600" ]; then
+      pass "GitHub CLI headless credential file has mode 600"
+    else
+      warn "GitHub CLI credential file should have mode 600 (found ${gh_hosts_mode:-unknown})"
+    fi
   else
-    warn "Restricted GitHub token $(basename "$token_file") should have mode 600 (found ${token_mode:-unknown})"
+    pass "GitHub CLI uses the system credential store"
   fi
-done
-if [ "$tokens_found" -eq 0 ]; then
-  warn "No restricted GitHub tokens were found in $token_dir"
+else
+  warn "GitHub CLI OAuth is not available in this shell"
 fi
 
 printf '\n%d failure(s), %d warning(s)\n' "$failures" "$warnings"

@@ -22,6 +22,10 @@ for command_name in git gh ghui jq yq mosh-server node npm proto herdr codex cla
   check_command "$command_name"
 done
 
+if [ "$(uname -s)" = "Darwin" ]; then
+  check_command mo
+fi
+
 if [ -f "$HOME/.pi/agent/compound-engineering/install-manifest.json" ] && \
    [ -d "$HOME/.pi/agent/agents" ] && \
    [ -d "$HOME/.pi/agent/skills" ]; then

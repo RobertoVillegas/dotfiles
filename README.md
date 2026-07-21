@@ -61,6 +61,7 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 - Skills globales para Herdr, descubrimiento y documentación.
 - Fastfetch, bottom/btop y utilidades modernas para procesos, disco, tareas y archivos.
 - LazyGit y Delta para Git, ghui para pull requests y LazyDocker para contenedores.
+- Mole (`mo`) para mantenimiento y análisis interactivo de macOS.
 - Portless y Tailscale Serve para compartir servicios de desarrollo.
 - OrbStack en macOS o clientes de Docker en Linux.
 

@@ -6,7 +6,9 @@ export PATH="$HOME/.local/bin:$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tool
 export PATH="$HOME/.local/bin:$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
 {{ end -}}
 
-[[ -d "$HOME/.orbstack/bin" ]] && export PATH="$HOME/.orbstack/bin:$PATH"
+# Keep OrbStack's clients available without letting its bundled runtimes
+# override the versions selected by Proto.
+[[ -d "$HOME/.orbstack/bin" ]] && export PATH="$PATH:$HOME/.orbstack/bin"
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
 {{ if eq .profile "dev" -}}

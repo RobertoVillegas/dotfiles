@@ -55,6 +55,8 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 - Node, npm, pnpm y Bun administrados por Proto.
 - Codex, Claude Code, OpenCode, Pi y LazyPi.
 - Ax y Agent Browser para acceso y automatización web.
+- Context7 por CLI para consultar documentación actual, sin MCP.
+- Skills globales para Herdr, descubrimiento y documentación.
 - Portless y Tailscale Serve para compartir servicios de desarrollo.
 - OrbStack en macOS o clientes de Docker en Linux.
 

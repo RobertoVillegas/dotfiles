@@ -13,11 +13,11 @@ Tailscale, OrbStack, and agent CLIs are reused or updated in place.
 ## Automated setup
 
 The role installs the portable development toolchain, Mosh, Hunk, Herdr, the
-`herdr-file-viewer` plugin, agent CLIs, Ax, Agent Browser, Portless, the shared
-devbox context, global networking and browser-automation skills, and LazyPi's
-complete public Pi catalog. macOS receives Tailscale and OrbStack; Linux
-receives Docker clients but leaves the daemon to the distribution package
-manager.
+`herdr-file-viewer` and Termscope plugins, agent CLIs, Ax, Agent Browser,
+Portless, the shared devbox context, global networking, browser-automation,
+Herdr, skill-discovery, and Context7 documentation skills, and LazyPi's complete
+public Pi catalog. macOS receives Tailscale and OrbStack; Linux receives Docker
+clients but leaves the daemon to the distribution package manager.
 
 LazyPi is installed through its pinned official installer. It provisions the
 public extensions, themes, agents, skills, and Compound Engineering output, but
@@ -187,3 +187,18 @@ interaction, screenshots, console inspection, or end-to-end testing. Agent
 Browser uses its own downloaded Chrome for Testing and does not require an MCP
 server. Page-content boundary markers are enabled globally as a defense against
 prompt injection; other security policies remain task-specific.
+
+## Global agent skills
+
+Codex and OpenCode discover the portable skills in `~/.agents/skills`. Claude
+Code receives symlinks to the same source files under `~/.claude/skills`.
+
+- `herdr` teaches agents to inspect and control Herdr only from a managed pane.
+- `find-skills` searches the public agent-skills ecosystem.
+- `find-docs` is Context7's official documentation lookup workflow.
+- `agent-browser` and `devbox-network` cover browser automation and private
+  service exposure.
+
+`find-docs` calls `npx ctx7@latest` directly and does not install or configure a
+Context7 MCP server. It works without authentication at the public rate limit;
+Context7 login or an API key is optional and remains machine-private.

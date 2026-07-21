@@ -52,7 +52,10 @@ for instruction_file in \
   "$HOME/.claude/CLAUDE.md" \
   "$HOME/.config/opencode/AGENTS.md" \
   "$HOME/.agents/skills/devbox-network/SKILL.md" \
-  "$HOME/.agents/skills/agent-browser/SKILL.md"; do
+  "$HOME/.agents/skills/agent-browser/SKILL.md" \
+  "$HOME/.agents/skills/find-docs/SKILL.md" \
+  "$HOME/.agents/skills/find-skills/SKILL.md" \
+  "$HOME/.agents/skills/herdr/SKILL.md"; do
   if [ -e "$instruction_file" ]; then
     pass "$instruction_file"
   else

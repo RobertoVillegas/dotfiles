@@ -13,4 +13,10 @@ if ! herdr plugin list --json |
   echo "Installing herdr-file-viewer..."
   herdr plugin install smarzban/herdr-file-viewer --yes
 fi
+
+if ! herdr plugin list --json |
+  jq -e '.result.plugins[]? | select(.plugin_id == "termscope")' >/dev/null; then
+  echo "Installing termscope..."
+  herdr plugin install iurysza/termscope --yes
+fi
 {{- end }}

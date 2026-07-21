@@ -18,7 +18,7 @@ check_command() {
 
 printf 'Devbox doctor\n\n'
 
-for command_name in git gh jq yq mosh-server node npm proto herdr codex claude opencode pi tailscale ax agent-browser portless fastfetch btm dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
+for command_name in git gh ghui jq yq mosh-server node npm proto herdr codex claude opencode pi tailscale ax agent-browser portless fastfetch btm btop lazydocker lazygit delta zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
   check_command "$command_name"
 done
 

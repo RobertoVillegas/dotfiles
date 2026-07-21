@@ -124,25 +124,37 @@ Put the machine-specific Git identity and signing configuration in
     gpgsign = true
 ```
 
-## Restricted GitHub CLI token on macOS
+## Restricted GitHub CLI tokens
 
 Create a fine-grained token limited to the required repositories. Typical
 permissions are Metadata read, Contents read, Pull requests write, Issues
 write when needed, and Actions read. Do not grant Administration, Secrets,
 Variables, Workflows, Webhooks, Environments, or organization administration.
 
-Store the token without putting it in shell history:
+Interactive macOS login Keychains are isolated from SSH audit sessions, so a
+headless agent cannot reliably retrieve a token from the login Keychain. Store
+each token in a private directory that is never managed by chezmoi or committed:
 
 ```zsh
+install -d -m 700 "$HOME/.config/gh-tokens"
 read -s "GH_TOKEN?Paste the restricted token: "
 echo
-security add-generic-password -U -a "$USER" \
-  -s github-devbox-gh-token -w "$GH_TOKEN"
+(umask 077; printf '%s' "$GH_TOKEN" > "$HOME/.config/gh-tokens/personal")
 unset GH_TOKEN
 ```
 
-The devbox `~/.local/bin/gh` wrapper retrieves it only for each `gh` invocation
-rather than exporting it to every child process, including agent sessions.
+The default file is `~/.config/gh-tokens/personal`. The devbox
+`~/.local/bin/gh` wrapper reads it only for each `gh` invocation rather than
+exporting it to every child process. To use an organization-specific token,
+point one invocation at another mode-600 file:
+
+```sh
+GH_TOKEN_FILE="$HOME/.config/gh-tokens/apto" gh pr list
+```
+
+FileVault protects these files at rest on macOS. Their directory and file modes
+limit access to the devbox account while it is running. Never add this directory
+to the chezmoi source state or any repository.
 
 ## Services
 

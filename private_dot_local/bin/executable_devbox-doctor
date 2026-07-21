@@ -64,17 +64,18 @@ else
   warn "Git SSH signing is not fully configured"
 fi
 
-if [ "$(uname -s)" = "Darwin" ]; then
-  current_user="${USER:-$(id -un)}"
-  if security find-generic-password -a "$current_user" -s github-devbox-gh-token >/dev/null 2>&1; then
-    pass "Restricted GitHub token exists in Keychain"
+token_file="$HOME/.config/gh-tokens/personal"
+if [ -s "$token_file" ]; then
+  token_mode="$(stat -f '%Lp' "$token_file" 2>/dev/null || stat -c '%a' "$token_file" 2>/dev/null || true)"
+  if [ "$token_mode" = "600" ]; then
+    pass "Restricted personal GitHub token exists with mode 600"
   else
-    warn "Restricted GitHub token was not found in macOS Keychain"
+    warn "Restricted personal GitHub token should have mode 600 (found ${token_mode:-unknown})"
   fi
 elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   pass "GitHub CLI is authenticated"
 else
-  warn "GitHub CLI is not authenticated"
+  warn "Restricted personal GitHub token was not found at $token_file"
 fi
 
 printf '\n%d failure(s), %d warning(s)\n' "$failures" "$warnings"

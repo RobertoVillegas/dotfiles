@@ -10,8 +10,15 @@ else
   exit 127
 fi
 
-current_user="${USER:-$(id -un)}"
-token="$(security find-generic-password -a "$current_user" -s github-devbox-gh-token -w 2>/dev/null || true)"
+if [ -n "${GH_TOKEN:-}" ]; then
+  exec "$real_gh" "$@"
+fi
+
+token_file="${GH_TOKEN_FILE:-$HOME/.config/gh-tokens/personal}"
+token=""
+if [ -r "$token_file" ]; then
+  token="$(tr -d '\r\n' < "$token_file")"
+fi
 if [ -n "$token" ]; then
   GH_TOKEN="$token" exec "$real_gh" "$@"
 fi

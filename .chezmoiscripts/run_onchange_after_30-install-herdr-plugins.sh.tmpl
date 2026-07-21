@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{- if eq .profile "dev" }}
+
+if ! command -v herdr >/dev/null 2>&1; then
+  echo "Herdr is unavailable; cannot install Herdr plugins." >&2
+  exit 1
+fi
+
+if ! herdr plugin list --json |
+  jq -e '.result.plugins[]? | select(.plugin_id == "herdr-file-viewer")' >/dev/null; then
+  echo "Installing herdr-file-viewer..."
+  herdr plugin install smarzban/herdr-file-viewer
+fi
+{{- end }}

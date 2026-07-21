@@ -12,10 +12,10 @@ Tailscale, OrbStack, and agent CLIs are reused or updated in place.
 
 ## Automated setup
 
-The role installs the portable development toolchain, Mosh, Herdr, agent CLIs,
-the shared devbox context, and the `devbox-network` skill. macOS receives
-Tailscale and OrbStack; Linux receives Docker clients but leaves the daemon to
-the distribution package manager.
+The role installs the portable development toolchain, Mosh, Hunk, Herdr, the
+`herdr-file-viewer` plugin, agent CLIs, the shared devbox context, and the
+`devbox-network` skill. macOS receives Tailscale and OrbStack; Linux receives
+Docker clients but leaves the daemon to the distribution package manager.
 
 On Linux, install and enroll the distro-supported Tailscale package and install
 Docker Engine through the distribution's supported packages. The profile does

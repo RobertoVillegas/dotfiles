@@ -141,8 +141,12 @@ chmod 600 "$HOME/.config/gh/hosts.yml"
 
 The resulting default OAuth scopes are `repo`, `read:org`, and `gist`. The
 credential file is private to the devbox account and must never be managed by
-chezmoi or committed. Keep organization-specific Git email conditions in the
-unmanaged `~/.gitconfig.local`.
+chezmoi or committed. Keep a personal email as the global default. Override it
+only inside repositories that require a different identity:
+
+```sh
+git config user.email WORK_EMAIL
+```
 
 ## Services
 

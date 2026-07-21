@@ -59,6 +59,7 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 - Ax y Agent Browser para acceso y automatización web.
 - Context7 por CLI para consultar documentación actual, sin MCP.
 - Skills globales para Herdr, descubrimiento y documentación.
+- Fastfetch y utilidades modernas para procesos, disco, tareas y archivos.
 - Portless y Tailscale Serve para compartir servicios de desarrollo.
 - OrbStack en macOS o clientes de Docker en Linux.
 

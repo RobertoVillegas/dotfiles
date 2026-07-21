@@ -19,6 +19,10 @@ Herdr, skill-discovery, and Context7 documentation skills, and LazyPi's complete
 public Pi catalog. macOS receives Tailscale and OrbStack; Linux receives Docker
 clients but leaves the daemon to the distribution package manager.
 
+The CLI toolbox includes Fastfetch, bottom, dust, duf, procs, just, Watchexec,
+Hyperfine, yq, ShellCheck, shfmt, Git LFS, and tealdeer. Fastfetch is available
+on demand and is not run automatically during SSH login.
+
 LazyPi is installed through its pinned official installer. It provisions the
 public extensions, themes, agents, skills, and Compound Engineering output, but
 the dotfiles never manage `~/.pi` itself. Pi credentials, sessions, memory,

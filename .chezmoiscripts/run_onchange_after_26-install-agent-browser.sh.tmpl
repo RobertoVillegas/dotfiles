@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+set -eu
+
+{{ if and (eq .profile "dev") (eq .role "devbox") -}}
+agent-browser install
+{{ else -}}
+:
+{{ end -}}

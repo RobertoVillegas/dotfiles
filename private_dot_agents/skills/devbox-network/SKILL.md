@@ -11,16 +11,17 @@ Expose only the service requested by the user and keep it private to the tailnet
 
 1. Read repository instructions, manifests, lockfiles, and existing start scripts. Reuse the selected package manager and existing Herdr session when available.
 2. Determine the local port and protocol. Check it with `lsof -nP -iTCP:<port> -sTCP:LISTEN` on macOS or `ss -lntp` on Linux. Do not stop an unrelated listener.
-3. Inspect existing mappings with `tailscale serve status`. Do not overwrite or reset unrelated mappings.
-4. Bind the application to `127.0.0.1` by default. For Docker, publish only to loopback, for example `127.0.0.1:5432:5432`.
-5. Start the service using the repository's normal command. Verify it locally with an appropriate health check before exposing it.
-6. Confirm `tailscale status` succeeds. For HTTP, run `tailscale serve --bg --https=<port> http://127.0.0.1:<port>`. For raw TCP, run `tailscale serve --bg --tcp=<port> tcp://127.0.0.1:<port>`.
-7. Run `tailscale serve status` again and report the actual URL or host and port shown by Tailscale. Never invent a tailnet hostname.
-8. Report the process, local port, remote address, verification result, and exact command that disables only the mapping created for this task.
+3. Inspect existing routes with `portless list` when Portless is available and mappings with `tailscale serve status`. Do not overwrite or reset unrelated routes.
+4. For a compatible HTTP development server, prefer running the repository's normal development command through `portless run --tailscale`. Portless should infer the project name, select an available port, preserve worktree-specific names, and register the private Tailscale mapping. Do not add Portless configuration to the repository unless the user requests it.
+5. Verify the service locally, then run `portless list` and `tailscale serve status`. Report both the local named URL and the actual tailnet URL emitted by the tools. Never invent a hostname.
+6. If Portless is unavailable or incompatible, bind the application to `127.0.0.1`, verify it locally, and expose HTTP with `tailscale serve --bg --https=<port> http://127.0.0.1:<port>`.
+7. For Docker, publish only to loopback, for example `127.0.0.1:5432:5432`. For raw TCP, verify locally and run `tailscale serve --bg --tcp=<port> tcp://127.0.0.1:<port>`.
+8. Report the process, local port, remote address, verification result, and the exact project-scoped command or process action that stops what this task created.
 
 ## Rules
 
 - Never use Tailscale Funnel or another public tunnel unless explicitly requested.
+- Do not enable Portless LAN mode; use its explicit Tailscale integration.
 - Do not bind to `0.0.0.0` unless loopback plus Serve cannot support the application and the user accepts broader LAN exposure.
 - Diagnose HMR, websocket, callback, origin, and trusted-host settings before changing the bind address.
 - Do not expose a database without its own authentication.

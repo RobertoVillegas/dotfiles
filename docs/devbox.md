@@ -13,9 +13,10 @@ Tailscale, OrbStack, and agent CLIs are reused or updated in place.
 ## Automated setup
 
 The role installs the portable development toolchain, Mosh, Hunk, Herdr, the
-`herdr-file-viewer` plugin, agent CLIs, the shared devbox context, and the
-`devbox-network` skill. macOS receives Tailscale and OrbStack; Linux receives
-Docker clients but leaves the daemon to the distribution package manager.
+`herdr-file-viewer` plugin, agent CLIs, Ax, Agent Browser, Portless, the shared
+devbox context, and global networking and browser-automation skills. macOS
+receives Tailscale and OrbStack; Linux receives Docker clients but leaves the
+daemon to the distribution package manager.
 
 On Linux, install and enroll the distro-supported Tailscale package and install
 Docker Engine through the distribution's supported packages. The profile does
@@ -150,7 +151,18 @@ git config user.email WORK_EMAIL
 
 ## Services
 
-Bind services to loopback and use the installed skill to expose them privately:
+For compatible HTTP development servers, Portless assigns a collision-free
+local URL and registers the private Tailscale mapping without changing the
+repository:
+
+```sh
+portless run --tailscale
+portless list
+tailscale serve status
+```
+
+The networking skill falls back to direct Tailscale Serve for incompatible HTTP
+servers and uses it for raw TCP services:
 
 ```sh
 tailscale serve --bg --https=3000 http://127.0.0.1:3000
@@ -160,3 +172,12 @@ tailscale serve status
 
 Never commit application passwords. Use ignored `.env` files or the project's
 existing secret-management mechanism.
+
+## Agent web tools
+
+Use `ax` for inexpensive HTTP fetch, discovery, extraction, and Markdown
+conversion. Use the global `agent-browser` skill when a page needs JavaScript,
+interaction, screenshots, console inspection, or end-to-end testing. Agent
+Browser uses its own downloaded Chrome for Testing and does not require an MCP
+server. Page-content boundary markers are enabled globally as a defense against
+prompt injection; other security policies remain task-specific.

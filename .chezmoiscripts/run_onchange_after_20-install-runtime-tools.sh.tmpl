@@ -13,7 +13,13 @@ npm install --global \
   @fission-ai/openspec \
   @google/gemini-cli \
   @openai/codex \
+{{- if eq .role "devbox" }}
+  agent-browser \
+{{- end }}
   bash-language-server \
+{{- if eq .role "devbox" }}
+  portless \
+{{- end }}
   pyright \
   typescript \
   typescript-language-server

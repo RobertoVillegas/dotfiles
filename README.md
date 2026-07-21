@@ -41,8 +41,9 @@ Run `./bootstrap --help` for every option. The script is idempotent and uses
 - `minimal`: Zsh, Oh My Zsh, Pure, Git, tmux, proto, and core CLI tools.
 - `dev`: minimal plus AI agents, runtimes, Hunk, Herdr with its file-viewer
   plugin, development tools, DataGrip, Postman, Bruno, and Paper on macOS.
-- `--devbox`: headless `dev` role with Mosh, Herdr, agents, private Tailscale
-  service workflows, and no workstation or personal applications.
+- `--devbox`: headless `dev` role with Mosh, Herdr, agents, Ax, Agent Browser,
+  Portless, private Tailscale service workflows, and no workstation or personal
+  applications.
 - `--personal`: Spotify and Flow. Sleeve and Ports require a manual download
   because they do not have reliable Homebrew casks.
 

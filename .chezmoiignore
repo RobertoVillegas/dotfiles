@@ -21,9 +21,11 @@ Library
 {{ else }}
 .config/devbox
 .agents/skills/devbox-network
+.agents/skills/agent-browser
 .codex/AGENTS.md
 .claude/CLAUDE.md
 .claude/skills/devbox-network
+.claude/skills/agent-browser
 .config/opencode/AGENTS.md
 .local/bin/devbox-doctor
 .local/bin/gh

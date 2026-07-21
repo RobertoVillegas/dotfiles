@@ -8,3 +8,8 @@ export PATH="$HOME/.local/bin:$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tool
 
 [[ -d "$HOME/.orbstack/bin" ]] && export PATH="$HOME/.orbstack/bin:$PATH"
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+
+{{ if eq .profile "dev" -}}
+# Mark browser-derived output as untrusted content when agents automate pages.
+export AGENT_BROWSER_CONTENT_BOUNDARIES=1
+{{ end -}}

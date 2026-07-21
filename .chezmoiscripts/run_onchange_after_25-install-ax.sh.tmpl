@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+set -eu
+
+{{ if eq .profile "dev" -}}
+export AX_VERSION="v0.1.19"
+installer="$(mktemp)"
+trap 'rm -f "$installer"' EXIT HUP INT TERM
+curl -fsSL https://ax.yusuke.run/install -o "$installer"
+sh "$installer"
+{{ else -}}
+:
+{{ end -}}

@@ -18,7 +18,7 @@ check_command() {
 
 printf 'Devbox doctor\n\n'
 
-for command_name in git gh jq mosh-server node npm proto herdr codex claude opencode tailscale; do
+for command_name in git gh jq mosh-server node npm proto herdr codex claude opencode tailscale ax agent-browser portless; do
   check_command "$command_name"
 done
 
@@ -43,7 +43,8 @@ for instruction_file in \
   "$HOME/.codex/AGENTS.md" \
   "$HOME/.claude/CLAUDE.md" \
   "$HOME/.config/opencode/AGENTS.md" \
-  "$HOME/.agents/skills/devbox-network/SKILL.md"; do
+  "$HOME/.agents/skills/devbox-network/SKILL.md" \
+  "$HOME/.agents/skills/agent-browser/SKILL.md"; do
   if [ -e "$instruction_file" ]; then
     pass "$instruction_file"
   else

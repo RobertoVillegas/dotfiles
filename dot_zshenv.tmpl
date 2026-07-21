@@ -1,9 +1,9 @@
 export PROTO_HOME="$HOME/.proto"
 export npm_config_prefix="$PROTO_HOME/tools/node/globals"
 {{ if eq .chezmoi.os "darwin" -}}
-export PATH="$HOME/.local/bin:$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 {{ else -}}
-export PATH="$HOME/.local/bin:$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
+export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$HOME/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
 {{ end -}}
 
 # Keep OrbStack's clients available without letting its bundled runtimes

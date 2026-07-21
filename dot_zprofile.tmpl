@@ -15,5 +15,5 @@ fi
 # Homebrew and OrbStack may prepend their own runtimes during login. Restore
 # Proto precedence here as well as in .zshenv so non-interactive SSH commands
 # and headless agents use the pinned toolchain without requiring .zshrc.
-export PATH="$HOME/.local/bin:$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$PATH"
+export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$HOME/.local/bin:$PATH"
 typeset -U path PATH

@@ -11,13 +11,23 @@ Library
 .config/herdr
 {{ end }}
 
-{{ if eq .role "devbox" }}
-.config/ghostty
-{{ else }}
+{{ if ne .profile "dev" }}
 .config/devbox
 .config/opencode
 .agents
 .claude
+.codex
+.local
+{{ else if eq .role "devbox" }}
+.config/ghostty
+{{ else }}
+.config/devbox
+.config/opencode
+.agents/skills/agent-browser
+.agents/skills/devbox-network
+.claude/CLAUDE.md
+.claude/skills/agent-browser
+.claude/skills/devbox-network
 .codex
 .local
 {{ end }}

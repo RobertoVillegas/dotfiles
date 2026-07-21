@@ -39,6 +39,8 @@ ejemplo, `dot_zshrc.tmpl` produce `~/.zshrc`, mientras que `executable_` y
 La workstation incluye Zsh, Oh My Zsh, Pure, Ghostty, Git, Proto, herramientas
 de desarrollo, agentes de código y aplicaciones como Raycast, 1Password,
 Tailscale y Zen. Durante el setup se puede elegir Zed, VS Code, ambos o ninguno.
+Las skills portables de Herdr, descubrimiento y documentación actual se
+comparten con el perfil devbox.
 
 Las aplicaciones personales son opcionales:
 

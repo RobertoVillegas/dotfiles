@@ -10,7 +10,9 @@ Personal apps are always opt-in.
 curl -fsSL https://raw.githubusercontent.com/RobertoVillegas/dotfiles/main/bootstrap | bash
 ```
 
-Defaults: `profile=dev`, `editor=zed`, `container=orbstack`, and no personal apps.
+Defaults: `profile=dev`, `role=workstation`, `editor=zed`, `container=auto`, and
+no personal apps. Automatic containers mean OrbStack on macOS; the Linux
+devbox manifest installs Docker clients and leaves the daemon distro-managed.
 
 ```sh
 # Minimal shell and CLI setup
@@ -21,6 +23,9 @@ curl -fsSL https://raw.githubusercontent.com/RobertoVillegas/dotfiles/main/boots
 
 # Development and personal macOS apps
 curl -fsSL https://raw.githubusercontent.com/RobertoVillegas/dotfiles/main/bootstrap | bash -s -- --dev --personal --editor=both
+
+# Headless devbox on macOS or Linux
+curl -fsSL https://raw.githubusercontent.com/RobertoVillegas/dotfiles/main/bootstrap | bash -s -- --devbox
 ```
 
 Run `./bootstrap --help` for every option. The script is idempotent and uses
@@ -31,12 +36,17 @@ Run `./bootstrap --help` for every option. The script is idempotent and uses
 - `minimal`: Zsh, Oh My Zsh, Pure, Git, tmux, proto, and core CLI tools.
 - `dev`: minimal plus AI agents, runtimes, development tools, DataGrip, Postman,
   Bruno, and Paper on macOS.
+- `--devbox`: headless `dev` role with Mosh, Herdr, agents, private Tailscale
+  service workflows, and no workstation or personal applications.
 - `--personal`: Spotify and Flow. Sleeve and Ports require a manual download
   because they do not have reliable Homebrew casks.
 
 The macOS `dev` profile adds Ghostty, Raycast, 1Password, Tailscale, Handy, and
 Zen. Linux receives the portable CLI setup; GUI applications remain
 distro-specific.
+
+See [the devbox guide](docs/devbox.md) for SSH, GitHub, Tailscale, and the
+manual security steps that deliberately remain outside bootstrap.
 
 The manifest intentionally excludes Neovim, Starship, DuckDB, Plex, VLC, Podman,
 QEMU, and emulators. Pure is the Zsh prompt, proto manages language runtimes,

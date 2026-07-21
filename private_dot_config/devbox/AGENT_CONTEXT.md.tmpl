@@ -1,0 +1,31 @@
+# Devbox environment
+
+## Machine role
+
+- This is a headless development host running {{ .chezmoi.os }}/{{ .chezmoi.arch }}.
+- The user connects remotely through Tailscale from another computer or mobile device.
+- Keep browsers, design tools, database GUIs, music, and other desktop applications on the client device.
+- Do not open GUI applications on this host unless explicitly requested.
+- Use existing Herdr sessions for persistent projects and agents when practical.
+
+## Development
+
+- Projects normally live under `~/src`.
+- Inspect repository instructions, manifests, and lockfiles before installing or running tools.
+- Use the package manager and commands already selected by each repository.
+- Proto provides Node, npm, pnpm, and Bun; do not create competing lockfiles or migrate package managers implicitly.
+- Avoid duplicate databases, container stacks, watchers, and development servers.
+
+## Networking
+
+- Local services must remain private to the host or tailnet.
+- Prefer loopback bindings such as `127.0.0.1:3000` and Docker mappings such as `127.0.0.1:5432:5432`.
+- Use the `devbox-network` skill when a service must be reachable from a client device.
+- Never use Tailscale Funnel or another public tunnel unless explicitly requested.
+
+## Git and credentials
+
+- Git authentication and signing use a dedicated machine identity configured outside the dotfiles repository.
+- Prefer feature branches and pull requests for protected branches.
+- GitHub CLI may have intentionally restricted permissions; explain a denied permission instead of broadening credentials.
+- Never write tokens, private keys, passwords, or authentication state into a repository.

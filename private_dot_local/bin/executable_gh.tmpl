@@ -1,0 +1,19 @@
+#!/bin/sh
+set -u
+
+if [ -x /opt/homebrew/bin/gh ]; then
+  real_gh=/opt/homebrew/bin/gh
+elif [ -x /usr/local/bin/gh ]; then
+  real_gh=/usr/local/bin/gh
+else
+  echo "Homebrew gh executable was not found" >&2
+  exit 127
+fi
+
+current_user="${USER:-$(id -un)}"
+token="$(security find-generic-password -a "$current_user" -s github-devbox-gh-token -w 2>/dev/null || true)"
+if [ -n "$token" ]; then
+  GH_TOKEN="$token" exec "$real_gh" "$@"
+fi
+
+exec "$real_gh" "$@"

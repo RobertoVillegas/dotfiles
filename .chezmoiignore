@@ -1,16 +1,36 @@
 README.md
 LICENSE
 bootstrap
+docs
 
-{{ if or (ne .chezmoi.os "darwin") (ne .profile "dev") (and (ne .editor "vscode") (ne .editor "both")) }}
-Library/Application Support/Code/User
+{{ if or (ne .chezmoi.os "darwin") (ne .profile "dev") (ne .role "workstation") (and (ne .editor "vscode") (ne .editor "both")) }}
+Library
 {{ end }}
 
-{{ if or (ne .profile "dev") (and (ne .editor "zed") (ne .editor "both")) }}
+{{ if or (ne .profile "dev") (ne .role "workstation") (and (ne .editor "zed") (ne .editor "both")) }}
 .config/zed
 {{ end }}
 
 {{ if ne .profile "dev" }}
 .config/ghostty
 .config/herdr
+{{ end }}
+
+{{ if eq .role "devbox" }}
+.config/ghostty
+{{ else }}
+.config/devbox
+.agents/skills/devbox-network
+.codex/AGENTS.md
+.claude/CLAUDE.md
+.claude/skills/devbox-network
+.config/opencode/AGENTS.md
+.local/bin/devbox-doctor
+.local/bin/gh
+.local/bin/tailscale
+{{ end }}
+
+{{ if or (ne .role "devbox") (ne .chezmoi.os "darwin") }}
+.local/bin/gh
+.local/bin/tailscale
 {{ end }}

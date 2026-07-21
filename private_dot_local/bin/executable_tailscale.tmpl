@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+app_cli="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+if [ ! -x "$app_cli" ]; then
+  echo "Tailscale CLI not found at $app_cli" >&2
+  exit 127
+fi
+
+export TAILSCALE_BE_CLI=1
+exec "$app_cli" "$@"

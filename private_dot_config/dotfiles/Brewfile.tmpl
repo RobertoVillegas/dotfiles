@@ -10,6 +10,9 @@ brew "gh"
 brew "git"
 brew "git-delta"
 brew "jq"
+{{- if eq .role "devbox" }}
+brew "mosh"
+{{- end }}
 brew "pure"
 brew "ripgrep"
 brew "tmux"
@@ -49,7 +52,7 @@ brew "watchman"
 brew "anomalyco/tap/opencode", trusted: true
 {{- end }}
 
-{{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") }}
+{{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") (eq .role "workstation") }}
 
 # macOS essentials.
 cask "1password"
@@ -73,12 +76,29 @@ cask "zed"
 cask "visual-studio-code"
 {{- end }}
 
-{{- if eq .container "orbstack" }}
+{{- if or (eq .container "auto") (eq .container "orbstack") }}
 cask "orbstack"
 {{- end }}
 {{- end }}
 
-{{- if and (eq .chezmoi.os "darwin") .personal }}
+{{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") (eq .role "devbox") }}
+
+# Headless macOS host. Tailscale and OrbStack still have app bundles, but no
+# workstation applications are installed.
+cask "tailscale-app"
+{{- if or (eq .container "auto") (eq .container "orbstack") }}
+cask "orbstack"
+{{- end }}
+{{- end }}
+
+{{- if and (eq .chezmoi.os "linux") (eq .profile "dev") (eq .role "devbox") (or (eq .container "auto") (eq .container "docker")) }}
+
+# The Docker daemon remains distro-managed; these provide portable clients.
+brew "docker"
+brew "docker-compose"
+{{- end }}
+
+{{- if and (eq .chezmoi.os "darwin") (eq .role "workstation") .personal }}
 brew "mas"
 cask "spotify"
 mas "Flow", id: 1423210932

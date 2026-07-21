@@ -2,9 +2,10 @@
 set -euo pipefail
 
 profile="dev"
+role="workstation"
 personal="false"
 editor="zed"
-container="orbstack"
+container="auto"
 repo="RobertoVillegas/dotfiles"
 
 usage() {
@@ -13,9 +14,11 @@ Usage: bootstrap [options]
 
   --dev                  Install the development profile (default)
   --minimal              Install only the portable core
+  --devbox               Configure a headless development host
+  --role=workstation|devbox
   --personal             Add personal applications
   --editor=zed|vscode|both|none
-  --container=orbstack|none
+  --container=auto|orbstack|docker|none
   --repo=OWNER/REPO      Override the chezmoi repository
   -h, --help             Show this help
 EOF
@@ -25,6 +28,8 @@ while (($#)); do
   case "$1" in
     --dev) profile="dev" ;;
     --minimal) profile="minimal" ;;
+    --devbox) profile="dev"; role="devbox"; personal="false"; editor="none" ;;
+    --role=*) role="${1#*=}" ;;
     --personal) personal="true" ;;
     --editor=*) editor="${1#*=}" ;;
     --container=*) container="${1#*=}" ;;
@@ -36,9 +41,17 @@ while (($#)); do
 done
 
 case "$editor" in zed|vscode|both|none) ;; *) echo "Invalid editor: $editor" >&2; exit 2 ;; esac
-case "$container" in orbstack|none) ;; *) echo "Invalid container runtime: $container" >&2; exit 2 ;; esac
+case "$role" in workstation|devbox) ;; *) echo "Invalid machine role: $role" >&2; exit 2 ;; esac
+case "$container" in auto|orbstack|docker|none) ;; *) echo "Invalid container runtime: $container" >&2; exit 2 ;; esac
+
+if [[ "$role" == "devbox" ]]; then
+  profile="dev"
+  personal="false"
+  editor="none"
+fi
 
 export DOTFILES_PROFILE="$profile"
+export DOTFILES_ROLE="$role"
 export DOTFILES_PERSONAL="$personal"
 export DOTFILES_EDITOR="$editor"
 export DOTFILES_CONTAINER="$container"
@@ -62,5 +75,5 @@ else
 fi
 
 echo
-echo "Dotfiles applied: profile=$profile editor=$editor container=$container personal=$personal"
+echo "Dotfiles applied: profile=$profile role=$role editor=$editor container=$container personal=$personal"
 echo "Restart the shell with: exec zsh -l"

@@ -1,5 +1,9 @@
 export PROTO_HOME="$HOME/.proto"
 export npm_config_prefix="$PROTO_HOME/tools/node/globals"
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$HOME/.local/bin:$PATH"
+{{ if eq .chezmoi.os "darwin" -}}
+export PATH="$HOME/.local/bin:$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+{{ else -}}
+export PATH="$HOME/.local/bin:$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
+{{ end -}}
 
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"

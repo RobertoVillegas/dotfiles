@@ -1,0 +1,81 @@
+#!/bin/sh
+set -u
+
+failures=0
+warnings=0
+
+pass() { printf 'ok    %s\n' "$1"; }
+warn() { printf 'warn  %s\n' "$1"; warnings=$((warnings + 1)); }
+fail() { printf 'fail  %s\n' "$1"; failures=$((failures + 1)); }
+
+check_command() {
+  if command -v "$1" >/dev/null 2>&1; then
+    pass "$1: $(command -v "$1")"
+  else
+    fail "$1 is not available"
+  fi
+}
+
+printf 'Devbox doctor\n\n'
+
+for command_name in git gh jq mosh-server node npm proto herdr codex claude opencode tailscale; do
+  check_command "$command_name"
+done
+
+if command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
+  pass "Tailscale is connected"
+  tailscale serve status 2>/dev/null || true
+else
+  warn "Tailscale is not connected or its CLI needs setup"
+fi
+
+if command -v docker >/dev/null 2>&1; then
+  if docker info >/dev/null 2>&1; then
+    pass "Docker daemon is reachable"
+  else
+    warn "Docker client exists but its daemon is not reachable"
+  fi
+else
+  warn "Docker client is not installed"
+fi
+
+for instruction_file in \
+  "$HOME/.codex/AGENTS.md" \
+  "$HOME/.claude/CLAUDE.md" \
+  "$HOME/.config/opencode/AGENTS.md" \
+  "$HOME/.agents/skills/devbox-network/SKILL.md"; do
+  if [ -e "$instruction_file" ]; then
+    pass "$instruction_file"
+  else
+    fail "$instruction_file is missing"
+  fi
+done
+
+if [ -f "$HOME/.ssh/devbox_github" ] && [ -f "$HOME/.ssh/devbox_github.pub" ]; then
+  pass "Dedicated GitHub SSH key exists"
+else
+  warn "Dedicated GitHub SSH key has not been provisioned"
+fi
+
+if [ "$(git config --global --get commit.gpgsign 2>/dev/null || true)" = "true" ] && \
+   [ "$(git config --global --get gpg.format 2>/dev/null || true)" = "ssh" ]; then
+  pass "Git SSH signing is enabled"
+else
+  warn "Git SSH signing is not fully configured"
+fi
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  current_user="${USER:-$(id -un)}"
+  if security find-generic-password -a "$current_user" -s github-devbox-gh-token >/dev/null 2>&1; then
+    pass "Restricted GitHub token exists in Keychain"
+  else
+    warn "Restricted GitHub token was not found in macOS Keychain"
+  fi
+elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  pass "GitHub CLI is authenticated"
+else
+  warn "GitHub CLI is not authenticated"
+fi
+
+printf '\n%d failure(s), %d warning(s)\n' "$failures" "$warnings"
+[ "$failures" -eq 0 ]

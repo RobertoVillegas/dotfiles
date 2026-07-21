@@ -1,0 +1,4 @@
+interface:
+  display_name: "Devbox Network"
+  short_description: "Expose private dev services over Tailscale"
+  default_prompt: "Use $devbox-network to start and privately expose this project's development service."

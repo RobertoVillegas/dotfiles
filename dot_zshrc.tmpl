@@ -11,7 +11,11 @@ autoload -Uz promptinit && promptinit
 prompt pure 2>/dev/null || true
 
 # Package manager homes.
+{{ if eq .chezmoi.os "darwin" -}}
 export PNPM_HOME="${PNPM_HOME:-$HOME/Library/pnpm}"
+{{ else -}}
+export PNPM_HOME="${PNPM_HOME:-$HOME/.local/share/pnpm}"
+{{ end -}}
 [[ -d "$PNPM_HOME" ]] && export PATH="$PNPM_HOME:$PATH"
 export BUN_INSTALL="$HOME/.bun"
 [[ -d "$BUN_INSTALL/bin" ]] && export PATH="$BUN_INSTALL/bin:$PATH"
@@ -35,7 +39,7 @@ if command -v brew >/dev/null 2>&1; then
   unset fzf_prefix
 fi
 
-{{ if eq .chezmoi.os "darwin" -}}
+{{ if and (eq .chezmoi.os "darwin") (eq .role "workstation") -}}
 export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 [[ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ]] && alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 {{ end -}}

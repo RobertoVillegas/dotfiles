@@ -1,8 +1,10 @@
 {{- $profile := env "DOTFILES_PROFILE" | default "dev" -}}
+{{- $role := env "DOTFILES_ROLE" | default "workstation" -}}
 {{- $editor := env "DOTFILES_EDITOR" | default "zed" -}}
-{{- $container := env "DOTFILES_CONTAINER" | default "orbstack" -}}
+{{- $container := env "DOTFILES_CONTAINER" | default "auto" -}}
 [data]
 profile = {{ $profile | quote }}
+role = {{ $role | quote }}
 editor = {{ $editor | quote }}
 container = {{ $container | quote }}
 personal = {{ eq (env "DOTFILES_PERSONAL") "true" }}

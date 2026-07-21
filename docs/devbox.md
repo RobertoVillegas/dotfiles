@@ -143,13 +143,21 @@ echo
 unset GH_TOKEN
 ```
 
-The default file is `~/.config/gh-tokens/personal`. The devbox
-`~/.local/bin/gh` wrapper reads it only for each `gh` invocation rather than
-exporting it to every child process. To use an organization-specific token,
-point one invocation at another mode-600 file:
+The devbox `~/.local/bin/gh` wrapper reads only one token for each invocation
+rather than exporting it to every child process. It selects automatically from
+the GitHub owner in `GH_REPO`, a `--repo`/`-R` argument, or the current
+repository's `origin` remote. Owner-to-token mappings live only in the private,
+unmanaged `~/.config/gh-tokens/owners` file. Configure entries with:
 
 ```sh
-GH_TOKEN_FILE="$HOME/.config/gh-tokens/apto" gh pr list
+git config --file "$HOME/.config/gh-tokens/owners" owner.ORGANIZATION.token organization
+```
+
+Keep organization-specific Git emails and conditional includes in the
+unmanaged `~/.gitconfig.local`. To override token selection for one invocation:
+
+```sh
+GH_TOKEN_FILE="$HOME/.config/gh-tokens/organization" gh pr list
 ```
 
 FileVault protects these files at rest on macOS. Their directory and file modes

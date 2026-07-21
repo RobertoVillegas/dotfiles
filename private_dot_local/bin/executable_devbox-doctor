@@ -78,18 +78,21 @@ else
   warn "Git SSH signing is not fully configured"
 fi
 
-token_file="$HOME/.config/gh-tokens/personal"
-if [ -s "$token_file" ]; then
+token_dir="$HOME/.config/gh-tokens"
+tokens_found=0
+for token_file in "$token_dir"/*; do
+  [ -f "$token_file" ] || continue
+  [ "$(basename "$token_file")" = "owners" ] && continue
+  tokens_found=$((tokens_found + 1))
   token_mode="$(stat -f '%Lp' "$token_file" 2>/dev/null || stat -c '%a' "$token_file" 2>/dev/null || true)"
   if [ "$token_mode" = "600" ]; then
-    pass "Restricted personal GitHub token exists with mode 600"
+    pass "Restricted GitHub token $(basename "$token_file") exists with mode 600"
   else
-    warn "Restricted personal GitHub token should have mode 600 (found ${token_mode:-unknown})"
+    warn "Restricted GitHub token $(basename "$token_file") should have mode 600 (found ${token_mode:-unknown})"
   fi
-elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  pass "GitHub CLI is authenticated"
-else
-  warn "Restricted personal GitHub token was not found at $token_file"
+done
+if [ "$tokens_found" -eq 0 ]; then
+  warn "No restricted GitHub tokens were found in $token_dir"
 fi
 
 printf '\n%d failure(s), %d warning(s)\n' "$failures" "$warnings"

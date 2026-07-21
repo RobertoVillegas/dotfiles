@@ -51,14 +51,28 @@ for instruction_file in \
   fi
 done
 
-if [ -f "$HOME/.ssh/devbox_github" ] && [ -f "$HOME/.ssh/devbox_github.pub" ]; then
-  pass "Dedicated GitHub SSH key exists"
+github_identity="$(ssh -G github.com 2>/dev/null | awk '$1 == "identityfile" { print $2; exit }')"
+case "$github_identity" in
+  '~/'*) github_identity="$HOME/${github_identity#\~/}" ;;
+esac
+if [ -n "$github_identity" ] && [ -f "$github_identity" ] && [ -f "$github_identity.pub" ]; then
+  pass "Dedicated GitHub SSH key exists: $github_identity"
 else
-  warn "Dedicated GitHub SSH key has not been provisioned"
+  warn "Dedicated GitHub SSH key is not configured or its files are missing"
 fi
 
-if [ "$(git config --global --get commit.gpgsign 2>/dev/null || true)" = "true" ] && \
-   [ "$(git config --global --get gpg.format 2>/dev/null || true)" = "ssh" ]; then
+signing_key="$(git config --global --includes --get user.signingkey 2>/dev/null || true)"
+case "$signing_key" in
+  '~/'*) signing_key="$HOME/${signing_key#\~/}" ;;
+esac
+allowed_signers="$(git config --global --includes --get gpg.ssh.allowedSignersFile 2>/dev/null || true)"
+case "$allowed_signers" in
+  '~/'*) allowed_signers="$HOME/${allowed_signers#\~/}" ;;
+esac
+if [ "$(git config --global --includes --get commit.gpgsign 2>/dev/null || true)" = "true" ] && \
+   [ "$(git config --global --includes --get tag.gpgsign 2>/dev/null || true)" = "true" ] && \
+   [ "$(git config --global --includes --get gpg.format 2>/dev/null || true)" = "ssh" ] && \
+   [ -f "$signing_key" ] && [ -f "$allowed_signers" ]; then
   pass "Git SSH signing is enabled"
 else
   warn "Git SSH signing is not fully configured"

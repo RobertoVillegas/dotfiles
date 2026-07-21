@@ -22,6 +22,18 @@ El instalador muestra un menú con tres opciones:
 El proceso es idempotente, así que el mismo comando sirve para terminar una
 instalación interrumpida o aplicar una actualización.
 
+## Estructura
+
+```text
+home/       configuración administrada por chezmoi
+docs/       guías para tareas que requieren intervención manual
+bootstrap   instalador y selector de perfiles
+```
+
+Los nombres técnicos dentro de `home/` representan atributos de chezmoi. Por
+ejemplo, `dot_zshrc.tmpl` produce `~/.zshrc`, mientras que `executable_` y
+`symlink_` conservan el tipo correcto del archivo al instalarlo.
+
 ## Workstation
 
 La workstation incluye Zsh, Oh My Zsh, Pure, Ghostty, Git, Proto, herramientas

@@ -1,8 +1,3 @@
-README.md
-LICENSE
-bootstrap
-docs
-
 {{ if or (ne .chezmoi.os "darwin") (ne .profile "dev") (ne .role "workstation") (and (ne .editor "vscode") (ne .editor "both")) }}
 Library
 {{ end }}
@@ -20,19 +15,13 @@ Library
 .config/ghostty
 {{ else }}
 .config/devbox
-.agents/skills/devbox-network
-.agents/skills/agent-browser
-.codex/AGENTS.md
-.claude/CLAUDE.md
-.claude/skills/devbox-network
-.claude/skills/agent-browser
-.config/opencode/AGENTS.md
-.local/bin/devbox-doctor
-.local/bin/gh
-.local/bin/tailscale
+.config/opencode
+.agents
+.claude
+.codex
+.local
 {{ end }}
 
-{{ if or (ne .role "devbox") (ne .chezmoi.os "darwin") }}
-.local/bin/gh
+{{ if and (eq .role "devbox") (ne .chezmoi.os "darwin") }}
 .local/bin/tailscale
 {{ end }}

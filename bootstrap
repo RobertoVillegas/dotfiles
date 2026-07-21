@@ -190,7 +190,7 @@ if [[ -n "$script_dir" && -d "$script_dir/.git" ]]; then
   chezmoi --source "$script_dir" init --apply
 else
   chezmoi_source="$(chezmoi source-path)"
-  if [[ -d "$chezmoi_source/.git" ]]; then
+  if git -C "$chezmoi_source" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     chezmoi update
   else
     chezmoi init --apply "$repo"

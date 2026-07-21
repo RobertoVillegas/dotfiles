@@ -18,9 +18,17 @@ check_command() {
 
 printf 'Devbox doctor\n\n'
 
-for command_name in git gh jq mosh-server node npm proto herdr codex claude opencode tailscale ax agent-browser portless; do
+for command_name in git gh jq mosh-server node npm proto herdr codex claude opencode pi tailscale ax agent-browser portless; do
   check_command "$command_name"
 done
+
+if [ -f "$HOME/.pi/agent/compound-engineering/install-manifest.json" ] && \
+   [ -d "$HOME/.pi/agent/agents" ] && \
+   [ -d "$HOME/.pi/agent/skills" ]; then
+  pass "LazyPi Compound Engineering catalog is installed"
+else
+  fail "LazyPi Compound Engineering catalog is incomplete"
+fi
 
 if command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
   pass "Tailscale is connected"

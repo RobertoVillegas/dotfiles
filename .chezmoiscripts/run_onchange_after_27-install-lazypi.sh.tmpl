@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+set -eu
+
+{{ if and (eq .profile "dev") (eq .role "devbox") -}}
+# Install the public catalog only. Pi credentials, sessions, memory, and other
+# machine data remain unmanaged under ~/.pi.
+npx --yes @robzolkos/lazypi@0.6.3 --yes
+{{ else -}}
+:
+{{ end -}}

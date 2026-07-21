@@ -14,9 +14,15 @@ Tailscale, OrbStack, and agent CLIs are reused or updated in place.
 
 The role installs the portable development toolchain, Mosh, Hunk, Herdr, the
 `herdr-file-viewer` plugin, agent CLIs, Ax, Agent Browser, Portless, the shared
-devbox context, and global networking and browser-automation skills. macOS
-receives Tailscale and OrbStack; Linux receives Docker clients but leaves the
-daemon to the distribution package manager.
+devbox context, global networking and browser-automation skills, and LazyPi's
+complete public Pi catalog. macOS receives Tailscale and OrbStack; Linux
+receives Docker clients but leaves the daemon to the distribution package
+manager.
+
+LazyPi is installed through its pinned official installer. It provisions the
+public extensions, themes, agents, skills, and Compound Engineering output, but
+the dotfiles never manage `~/.pi` itself. Pi credentials, sessions, memory,
+backups, and local settings remain machine-private.
 
 On Linux, install and enroll the distro-supported Tailscale package and install
 Docker Engine through the distribution's supported packages. The profile does

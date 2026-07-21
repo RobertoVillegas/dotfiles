@@ -6,6 +6,9 @@ Personal apps are always opt-in.
 
 ## Quick start
 
+Run the bootstrap without options to open an interactive menu for Workstation,
+Devbox, or Minimal setup:
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/RobertoVillegas/dotfiles/main/bootstrap | bash
 ```
@@ -13,6 +16,8 @@ curl -fsSL https://raw.githubusercontent.com/RobertoVillegas/dotfiles/main/boots
 Defaults: `profile=dev`, `role=workstation`, `editor=zed`, `container=auto`, and
 no personal apps. Automatic containers mean OrbStack on macOS; the Linux
 devbox manifest installs Docker clients and leaves the daemon distro-managed.
+
+Flags remain available for repeatable and non-interactive installs:
 
 ```sh
 # Minimal shell and CLI setup

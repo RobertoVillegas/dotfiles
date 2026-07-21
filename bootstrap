@@ -7,10 +7,13 @@ personal="false"
 editor="zed"
 container="auto"
 repo="RobertoVillegas/dotfiles"
+prompt_input="${DOTFILES_PROMPT_INPUT:-/dev/tty}"
 
 usage() {
   cat <<'EOF'
 Usage: bootstrap [options]
+
+Run without options to open the interactive setup menu.
 
   --dev                  Install the development profile (default)
   --minimal              Install only the portable core
@@ -23,6 +26,121 @@ Usage: bootstrap [options]
   -h, --help             Show this help
 EOF
 }
+
+read_choice() {
+  local prompt="$1"
+  local default_answer="$2"
+  local answer
+  while true; do
+    printf '%s' "$prompt" >&2
+    IFS= read -r answer <&3
+    answer="${answer:-$default_answer}"
+    case "$answer" in
+      1|2|3|4) printf '%s' "$answer"; return 0 ;;
+      *) printf 'Choose one of the listed numbers.\n' >&2 ;;
+    esac
+  done
+}
+
+read_yes_no() {
+  local prompt="$1"
+  local default_answer="$2"
+  local answer
+  while true; do
+    printf '%s' "$prompt" >&2
+    IFS= read -r answer <&3
+    answer="${answer:-$default_answer}"
+    case "$answer" in
+      y|Y|yes|YES) return 0 ;;
+      n|N|no|NO) return 1 ;;
+      *) printf 'Answer y or n.\n' >&2 ;;
+    esac
+  done
+}
+
+interactive_setup() {
+  local choice
+  exec 3<"$prompt_input"
+
+  cat <<'EOF'
+
+Dotfiles setup
+
+  1) Workstation  Development tools and macOS desktop apps
+  2) Devbox      Headless development host
+  3) Minimal     Shell and portable CLI essentials
+
+EOF
+
+  choice="$(read_choice 'Choose a setup [1]: ' "1")"
+  case "$choice" in
+    1)
+      profile="dev"
+      role="workstation"
+      container="auto"
+      cat <<'EOF'
+
+Editor
+
+  1) Zed
+  2) VS Code
+  3) Both
+  4) None
+
+EOF
+      choice="$(read_choice 'Choose an editor [1]: ' "1")"
+      case "$choice" in
+        1) editor="zed" ;;
+        2) editor="vscode" ;;
+        3) editor="both" ;;
+        4) editor="none" ;;
+      esac
+      if read_yes_no 'Install personal apps such as Spotify and Flow? [y/N]: ' "n"; then
+        personal="true"
+      fi
+      ;;
+    2)
+      profile="dev"
+      role="devbox"
+      editor="none"
+      container="auto"
+      personal="false"
+      ;;
+    3)
+      profile="minimal"
+      role="workstation"
+      editor="none"
+      container="none"
+      personal="false"
+      ;;
+  esac
+
+  cat <<EOF
+
+Selected configuration
+
+  Profile:        $profile
+  Role:           $role
+  Editor:         $editor
+  Containers:     $container
+  Personal apps:  $personal
+
+EOF
+
+  if ! read_yes_no 'Apply this configuration? [Y/n]: ' "y"; then
+    echo "Setup cancelled."
+    exit 0
+  fi
+  exec 3<&-
+}
+
+if (($# == 0)); then
+  if [[ -t 1 && ( "$prompt_input" != "/dev/tty" || -r /dev/tty ) ]]; then
+    interactive_setup
+  else
+    echo "No interactive terminal detected; using workstation defaults." >&2
+  fi
+fi
 
 while (($#)); do
   case "$1" in

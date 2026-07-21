@@ -189,7 +189,12 @@ fi
 if [[ -n "$script_dir" && -d "$script_dir/.git" ]]; then
   chezmoi --source "$script_dir" init --apply
 else
-  chezmoi init --apply "$repo"
+  chezmoi_source="$(chezmoi source-path)"
+  if [[ -d "$chezmoi_source/.git" ]]; then
+    chezmoi update
+  else
+    chezmoi init --apply "$repo"
+  fi
 fi
 
 echo

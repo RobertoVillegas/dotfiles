@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ -z "${WSL_INTEROP:-}" ]] && ! grep -qi microsoft /proc/sys/kernel/osrelease; then echo "wsl-provision must run inside WSL" >&2; exit 2; fi
+packages=(ca-certificates curl git openssh-server mosh build-essential pkg-config cmake ninja-build clang lld gdb python3 python3-venv python3-dev jq unzip zip rsync socat iproute2 dnsutils pciutils lsof strace tmux zsh)
+if dpkg-query -W 'nvidia-driver-*' 'cuda-drivers*' 2>/dev/null | grep -q .; then echo "Blocked: a Linux NVIDIA driver package is installed" >&2; exit 1; fi
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
+for dir in src work data/vsss runs checkpoints replays cache devbox-reports; do mkdir -p "$HOME/$dir"; done
+install -d -m 700 "$HOME/.ssh"
+sudo install -d -m 755 /etc/ssh/sshd_config.d
+password_auth=yes
+if [[ -s "$HOME/.ssh/authorized_keys" ]] && ssh-keygen -l -f "$HOME/.ssh/authorized_keys" >/dev/null 2>&1; then password_auth=no; chmod 600 "$HOME/.ssh/authorized_keys"; fi
+tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
+cat >"$tmp" <<EOF
+# Managed by RobertoVillegas/dotfiles. Re-run wsl-provision to update.
+Port 2222
+PubkeyAuthentication yes
+PasswordAuthentication $password_auth
+KbdInteractiveAuthentication no
+PermitRootLogin no
+AllowTcpForwarding yes
+X11Forwarding no
+EOF
+sudo install -m 644 "$tmp" /etc/ssh/sshd_config.d/60-devbox.conf
+sudo sshd -t
+sudo systemctl enable ssh.service
+sudo systemctl restart ssh.service
+if [[ "$password_auth" == yes ]]; then echo "WARNING: password auth remains enabled until a valid public key exists."; fi
+printf 'WSL provisioned; SSH password authentication=%s\n' "$password_auth"

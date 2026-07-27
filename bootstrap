@@ -230,6 +230,8 @@ else
   fi
 fi
 
+if [[ "$target" == "wsl" ]] && command -v wsl-provision >/dev/null 2>&1; then wsl-provision; fi
+
 echo
 echo "Dotfiles applied: profile=$profile role=$role target=$target gpu=$gpu container=$container remote-owner=$remote_owner editor=$editor personal=$personal"
 echo "Restart the shell with: exec zsh -l"

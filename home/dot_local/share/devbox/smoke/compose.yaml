@@ -1,0 +1,14 @@
+services:
+  cuda-smoke:
+    image: ${PYTORCH_IMAGE:?Set PYTORCH_IMAGE to a PyTorch CUDA image pinned by digest}
+    command: ["python", "/smoke/rl-smoke.py"]
+    volumes:
+      - ./rl-smoke.py:/smoke/rl-smoke.py:ro
+      - ${CHECKPOINT_DIR:?Set CHECKPOINT_DIR to a Linux-filesystem directory}:/checkpoints
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

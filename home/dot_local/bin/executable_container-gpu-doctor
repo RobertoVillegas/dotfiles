@@ -1,0 +1,9 @@
+#!/bin/sh
+set -u
+image="${CUDA_IMAGE:?Set CUDA_IMAGE to an official NVIDIA CUDA image pinned by digest}"
+printf 'Container GPU doctor\nimage=%s\n' "$image"
+command -v docker >/dev/null 2>&1 || { echo 'fail  Docker CLI absent'; exit 1; }
+docker info >/dev/null 2>&1 || { echo 'fail  Docker Desktop daemon/integration unavailable'; exit 1; }
+digest="$(docker image inspect "$image" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
+docker run --rm --gpus all "$image" sh -lc 'printf "cuda_runtime="; cat /usr/local/cuda/version.json 2>/dev/null || true; nvidia-smi'
+rc=$?; printf 'digest=%s\nexit_code=%s\n' "${digest:-from-reference}" "$rc"; exit "$rc"

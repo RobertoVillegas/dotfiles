@@ -11,6 +11,7 @@ if dpkg-query -W 'nvidia-driver-*' 'cuda-drivers*' 2>/dev/null | grep -q .; then
 fi
 sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${packages[@]}"
+sudo usermod --shell "$(command -v zsh)" "$USER"
 for dir in src work data/vsss runs checkpoints replays cache devbox-reports; do mkdir -p "$HOME/$dir"; done
 install -d -m 700 "$HOME/.ssh"
 sudo install -d -m 755 /etc/ssh/sshd_config.d

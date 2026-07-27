@@ -265,17 +265,28 @@ if [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]}" ]]; then
 fi
 
 if [[ -n "$script_dir" && -d "$script_dir/.git" ]]; then
-  chezmoi --source "$script_dir" init --apply
+  chezmoi --source "$script_dir" init
+  source_args=(--source "$script_dir")
 else
   chezmoi_source="$(chezmoi source-path)"
   if git -C "$chezmoi_source" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    chezmoi update
+    git -C "$chezmoi_source" pull --ff-only
+    chezmoi init
   else
-    chezmoi init --apply "$repo"
+    chezmoi init "$repo"
   fi
+  source_args=()
 fi
 
-if [[ "$target" == "wsl" ]] && command -v wsl-provision >/dev/null 2>&1; then wsl-provision; fi
+if [[ "$target" == "wsl" ]]; then
+  chezmoi "${source_args[@]}" apply --exclude=scripts
+  command -v wsl-provision >/dev/null 2>&1 || {
+    echo "wsl-provision was not deployed" >&2
+    exit 1
+  }
+  wsl-provision
+fi
+chezmoi "${source_args[@]}" apply
 
 echo
 echo "Dotfiles applied: profile=$profile role=$role target=$target gpu=$gpu container=$container remote-owner=$remote_owner editor=$editor personal=$personal"

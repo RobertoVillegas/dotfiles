@@ -109,3 +109,8 @@ Para revisar o reinstalar sólo los paquetes de Homebrew:
 ```sh
 brew bundle --file="$HOME/.config/dotfiles/Brewfile"
 ```
+
+
+## WSL2 + NVIDIA
+
+La configuración de Windows 11, Ubuntu WSL2, Docker Desktop, CUDA, acceso remoto y rollback está en [docs/wsl-nvidia-devbox.md](docs/wsl-nvidia-devbox.md).

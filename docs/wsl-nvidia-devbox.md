@@ -14,7 +14,7 @@ Add only a public client key to `~/.ssh/authorized_keys`, rerun `wsl-provision`,
 
 ## Validate
 
-Run `devbox-doctor`, `wsl-doctor`, and `gpu-doctor`. Set digest-pinned official images before `container-gpu-doctor` and `rl-smoke-doctor`. Reports belong under `~/devbox-reports/TIMESTAMP`, not Git. Active code and data belong under `~/src`, `~/work`, `~/data`, `~/runs`, `~/checkpoints`, and `~/replays`; `/mnt/c` is only an allowed backup destination.
+Run `devbox-doctor`, `wsl-doctor`, and `gpu-doctor`. Set digest-pinned official images before `container-gpu-doctor` and `rl-smoke-doctor`. Reports belong under `~/devbox-reports/TIMESTAMP`, not Git. Active code and data belong under `~/src`, `~/work`, `~/data`, `~/runs`, `~/checkpoints`, and `~/replays`; `/mnt/c` is only an allowed backup destination. This follows Microsoft's [WSL filesystem performance guidance](https://learn.microsoft.com/en-us/windows/wsl/filesystems#file-storage-and-performance-across-file-systems).
 
 Remote access is `ssh -p 2222 USER@WINDOWS_TAILSCALE_IP`; recover a session with `tmux attach -t dev`. Forward dashboards with `ssh -L 6006:127.0.0.1:6006 -p 2222 USER@WINDOWS_TAILSCALE_IP`. Mirrored networking is preferred. If it fails, document the reason, switch to NAT, add a narrow Windows portproxy and updater task, and keep external port 2222.
 

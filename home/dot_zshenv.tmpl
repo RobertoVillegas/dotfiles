@@ -5,6 +5,9 @@ export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bi
 {{ else -}}
 export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$HOME/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
 {{ end -}}
+{{ if and (eq .target "wsl") (eq .gpu "nvidia") -}}
+[[ -d /usr/lib/wsl/lib ]] && export PATH="/usr/lib/wsl/lib:$PATH"
+{{ end -}}
 
 # Keep OrbStack's clients available without letting its bundled runtimes
 # override the versions selected by Proto.

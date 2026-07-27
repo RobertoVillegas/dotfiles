@@ -6,6 +6,9 @@ role="workstation"
 personal="false"
 editor="zed"
 container="auto"
+target="auto"
+gpu="auto"
+remote_owner="auto"
 repo="RobertoVillegas/dotfiles"
 prompt_input="${DOTFILES_PROMPT_INPUT:-/dev/tty}"
 
@@ -21,7 +24,10 @@ Run without options to open the interactive setup menu.
   --role=workstation|devbox
   --personal             Add personal applications
   --editor=zed|vscode|both|none
-  --container=auto|orbstack|docker|none
+  --target=auto|macos|linux|wsl
+  --gpu=auto|nvidia|none
+  --container=auto|orbstack|docker-desktop|docker-engine|none
+  --remote-owner=auto|windows|linux
   --repo=OWNER/REPO      Override the chezmoi repository
   -h, --help             Show this help
 EOF
@@ -150,7 +156,10 @@ while (($#)); do
     --role=*) role="${1#*=}" ;;
     --personal) personal="true" ;;
     --editor=*) editor="${1#*=}" ;;
+    --target=*) target="${1#*=}" ;;
+    --gpu=*) gpu="${1#*=}" ;;
     --container=*) container="${1#*=}" ;;
+    --remote-owner=*) remote_owner="${1#*=}" ;;
     --repo=*) repo="${1#*=}" ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -160,7 +169,28 @@ done
 
 case "$editor" in zed|vscode|both|none) ;; *) echo "Invalid editor: $editor" >&2; exit 2 ;; esac
 case "$role" in workstation|devbox) ;; *) echo "Invalid machine role: $role" >&2; exit 2 ;; esac
-case "$container" in auto|orbstack|docker|none) ;; *) echo "Invalid container runtime: $container" >&2; exit 2 ;; esac
+case "$target" in auto|macos|linux|wsl) ;; *) echo "Invalid target: $target" >&2; exit 2 ;; esac
+case "$gpu" in auto|nvidia|none) ;; *) echo "Invalid GPU: $gpu" >&2; exit 2 ;; esac
+case "$container" in auto|orbstack|docker-desktop|docker-engine|none) ;; *) echo "Invalid container runtime: $container" >&2; exit 2 ;; esac
+case "$remote_owner" in auto|windows|linux) ;; *) echo "Invalid remote owner: $remote_owner" >&2; exit 2 ;; esac
+
+is_wsl=false
+if [[ -n "${WSL_INTEROP:-}" ]] || { [[ -r /proc/sys/kernel/osrelease ]] && grep -qi microsoft /proc/sys/kernel/osrelease; }; then is_wsl=true; fi
+if [[ "$target" == "auto" ]]; then
+  if $is_wsl; then target="wsl"; elif [[ "$(uname -s)" == "Darwin" ]]; then target="macos"; else target="linux"; fi
+fi
+if [[ "$gpu" == "auto" ]]; then
+  if [[ "$target" == "wsl" && -e /usr/lib/wsl/lib/libcuda.so ]]; then gpu="nvidia"; else gpu="none"; fi
+fi
+if [[ "$container" == "auto" ]]; then
+  if [[ "$target" == "macos" ]]; then container="orbstack"; elif [[ "$target" == "wsl" ]]; then container="docker-desktop"; else container="docker-engine"; fi
+fi
+if [[ "$remote_owner" == "auto" ]]; then
+  if [[ "$target" == "wsl" ]]; then remote_owner="windows"; else remote_owner="linux"; fi
+fi
+if [[ "$target" == "wsl" && "$container" == "orbstack" ]]; then echo "Invalid combination: target=wsl does not support container=orbstack" >&2; exit 2; fi
+if [[ "$target" == "macos" && "$gpu" == "nvidia" ]]; then echo "Invalid combination: target=macos does not support gpu=nvidia" >&2; exit 2; fi
+if [[ "$target" == "wsl" && "$container" == "docker-engine" ]]; then echo "Warning: Docker Engine inside WSL is an advanced, non-default route." >&2; fi
 
 if [[ "$role" == "devbox" ]]; then
   profile="dev"
@@ -172,7 +202,10 @@ export DOTFILES_PROFILE="$profile"
 export DOTFILES_ROLE="$role"
 export DOTFILES_PERSONAL="$personal"
 export DOTFILES_EDITOR="$editor"
+export DOTFILES_TARGET="$target"
+export DOTFILES_GPU="$gpu"
 export DOTFILES_CONTAINER="$container"
+export DOTFILES_REMOTE_OWNER="$remote_owner"
 
 if ! command -v chezmoi >/dev/null 2>&1; then
   bin_dir="$HOME/.local/bin"
@@ -198,5 +231,5 @@ else
 fi
 
 echo
-echo "Dotfiles applied: profile=$profile role=$role editor=$editor container=$container personal=$personal"
+echo "Dotfiles applied: profile=$profile role=$role target=$target gpu=$gpu container=$container remote-owner=$remote_owner editor=$editor personal=$personal"
 echo "Restart the shell with: exec zsh -l"

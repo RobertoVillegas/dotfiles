@@ -1,0 +1,9 @@
+[data]
+    profile = {{ env "DOTFILES_PROFILE" | default "dev" | quote }}
+    role = {{ env "DOTFILES_ROLE" | default "workstation" | quote }}
+    target = {{ env "DOTFILES_TARGET" | default "auto" | quote }}
+    gpu = {{ env "DOTFILES_GPU" | default "none" | quote }}
+    container = {{ env "DOTFILES_CONTAINER" | default "auto" | quote }}
+    remoteOwner = {{ env "DOTFILES_REMOTE_OWNER" | default "auto" | quote }}
+    editor = {{ env "DOTFILES_EDITOR" | default "none" | quote }}
+    personal = {{ env "DOTFILES_PERSONAL" | default "false" }}

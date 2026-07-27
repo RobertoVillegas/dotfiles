@@ -1,0 +1,5 @@
+[CmdletBinding()] param([string]$Distro='Ubuntu-26.04')
+$ErrorActionPreference='Continue'; $fail=0; function Test-Check($ok,$message){if($ok){"ok    $message"}else{"fail  $message";$script:fail++}}
+$version=(wsl.exe --version) -replace "`0",''; Test-Check ($LASTEXITCODE -eq 0) 'WSL version responds'; $list=(wsl.exe --list --verbose) -replace "`0",''; Test-Check (($list -join "`n") -match [regex]::Escape($Distro)) "$Distro installed"; Test-Check (($list -join "`n") -match "$([regex]::Escape($Distro)).*2") "$Distro uses WSL2"
+Test-Check ((nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>$null).Count -gt 0) 'Windows NVIDIA driver and GPU visible'; Test-Check ((Get-Service Tailscale -ErrorAction SilentlyContinue).Status -eq 'Running') 'Tailscale daemon active on Windows'; Test-Check (-not (Get-Service tailscaled -ErrorAction SilentlyContinue)) 'no duplicate Windows tailscaled service'
+docker info *> $null; Test-Check ($LASTEXITCODE -eq 0) 'Docker Desktop daemon reachable'; Test-Check ((docker context show) -eq 'desktop-linux') 'Docker desktop-linux context active'; $version; "failures=$fail"; if($fail){exit 1}

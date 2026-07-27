@@ -1,11 +1,19 @@
 #!/bin/sh
+# shellcheck disable=SC1091,SC2015 # sourced OS metadata; ok/fail helpers always succeed
 set -u
-f=0; ok(){ printf 'ok    %s\n' "$1"; }; fail(){ printf 'fail  %s\n' "$1"; f=$((f+1)); }
+f=0
+ok() { printf 'ok    %s\n' "$1"; }
+fail() {
+  printf 'fail  %s\n' "$1"
+  f=$((f + 1))
+}
 printf 'GPU doctor\n\n'
 [ -e /usr/lib/wsl/lib/libcuda.so ] && ok 'WSL libcuda.so exists' || fail 'WSL libcuda.so missing'
-smi="$(command -v nvidia-smi 2>/dev/null || true)"; [ -n "$smi" ] || [ ! -x /usr/lib/wsl/lib/nvidia-smi ] || smi=/usr/lib/wsl/lib/nvidia-smi
+smi="$(command -v nvidia-smi 2>/dev/null || true)"
+[ -n "$smi" ] || [ ! -x /usr/lib/wsl/lib/nvidia-smi ] || smi=/usr/lib/wsl/lib/nvidia-smi
 if [ -n "$smi" ] && out="$($smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>&1)"; then ok "GPU: $out"; else fail 'nvidia-smi unavailable'; fi
 if dpkg-query -W 'nvidia-driver-*' 'cuda-drivers*' 2>/dev/null | grep -q .; then fail 'Linux NVIDIA driver package installed'; else ok 'no Linux NVIDIA driver packages'; fi
 if lsmod | awk '$1=="nvidia"{found=1} END{exit !found}'; then fail 'Linux NVIDIA kernel module loaded'; else ok 'no Linux NVIDIA kernel module'; fi
 ldconfig -p 2>/dev/null | grep -q libcuda.so && ok 'CUDA driver API visible to linker' || fail 'CUDA driver API absent from linker cache'
-printf '\n%d failure(s)\n' "$f"; [ "$f" -eq 0 ]
+printf '\n%d failure(s)\n' "$f"
+[ "$f" -eq 0 ]

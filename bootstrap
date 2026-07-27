@@ -42,7 +42,10 @@ read_choice() {
     IFS= read -r answer <&3
     answer="${answer:-$default_answer}"
     case "$answer" in
-      1|2|3|4) printf '%s' "$answer"; return 0 ;;
+      1 | 2 | 3 | 4)
+        printf '%s' "$answer"
+        return 0
+        ;;
       *) printf 'Choose one of the listed numbers.\n' >&2 ;;
     esac
   done
@@ -57,8 +60,8 @@ read_yes_no() {
     IFS= read -r answer <&3
     answer="${answer:-$default_answer}"
     case "$answer" in
-      y|Y|yes|YES) return 0 ;;
-      n|N|no|NO) return 1 ;;
+      y | Y | yes | YES) return 0 ;;
+      n | N | no | NO) return 1 ;;
       *) printf 'Answer y or n.\n' >&2 ;;
     esac
   done
@@ -141,7 +144,7 @@ EOF
 }
 
 if (($# == 0)); then
-  if [[ -t 1 && ( "$prompt_input" != "/dev/tty" || -r /dev/tty ) ]]; then
+  if [[ -t 1 && ("$prompt_input" != "/dev/tty" || -r /dev/tty) ]]; then
     interactive_setup
   else
     echo "No interactive terminal detected; using workstation defaults." >&2
@@ -152,7 +155,12 @@ while (($#)); do
   case "$1" in
     --dev) profile="dev" ;;
     --minimal) profile="minimal" ;;
-    --devbox) profile="dev"; role="devbox"; personal="false"; editor="none" ;;
+    --devbox)
+      profile="dev"
+      role="devbox"
+      personal="false"
+      editor="none"
+      ;;
     --role=*) role="${1#*=}" ;;
     --personal) personal="true" ;;
     --editor=*) editor="${1#*=}" ;;
@@ -161,18 +169,49 @@ while (($#)); do
     --container=*) container="${1#*=}" ;;
     --remote-owner=*) remote_owner="${1#*=}" ;;
     --repo=*) repo="${1#*=}" ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
   esac
   shift
 done
 
-case "$editor" in zed|vscode|both|none) ;; *) echo "Invalid editor: $editor" >&2; exit 2 ;; esac
-case "$role" in workstation|devbox) ;; *) echo "Invalid machine role: $role" >&2; exit 2 ;; esac
-case "$target" in auto|macos|linux|wsl) ;; *) echo "Invalid target: $target" >&2; exit 2 ;; esac
-case "$gpu" in auto|nvidia|none) ;; *) echo "Invalid GPU: $gpu" >&2; exit 2 ;; esac
-case "$container" in auto|orbstack|docker-desktop|docker-engine|none) ;; *) echo "Invalid container runtime: $container" >&2; exit 2 ;; esac
-case "$remote_owner" in auto|windows|linux) ;; *) echo "Invalid remote owner: $remote_owner" >&2; exit 2 ;; esac
+case "$editor" in zed | vscode | both | none) ;; *)
+  echo "Invalid editor: $editor" >&2
+  exit 2
+  ;;
+esac
+case "$role" in workstation | devbox) ;; *)
+  echo "Invalid machine role: $role" >&2
+  exit 2
+  ;;
+esac
+case "$target" in auto | macos | linux | wsl) ;; *)
+  echo "Invalid target: $target" >&2
+  exit 2
+  ;;
+esac
+case "$gpu" in auto | nvidia | none) ;; *)
+  echo "Invalid GPU: $gpu" >&2
+  exit 2
+  ;;
+esac
+case "$container" in auto | orbstack | docker-desktop | docker-engine | none) ;; *)
+  echo "Invalid container runtime: $container" >&2
+  exit 2
+  ;;
+esac
+case "$remote_owner" in auto | windows | linux) ;; *)
+  echo "Invalid remote owner: $remote_owner" >&2
+  exit 2
+  ;;
+esac
 
 is_wsl=false
 if [[ -n "${WSL_INTEROP:-}" ]] || { [[ -r /proc/sys/kernel/osrelease ]] && grep -qi microsoft /proc/sys/kernel/osrelease; }; then is_wsl=true; fi
@@ -188,8 +227,14 @@ fi
 if [[ "$remote_owner" == "auto" ]]; then
   if [[ "$target" == "wsl" ]]; then remote_owner="windows"; else remote_owner="linux"; fi
 fi
-if [[ "$target" == "wsl" && "$container" == "orbstack" ]]; then echo "Invalid combination: target=wsl does not support container=orbstack" >&2; exit 2; fi
-if [[ "$target" == "macos" && "$gpu" == "nvidia" ]]; then echo "Invalid combination: target=macos does not support gpu=nvidia" >&2; exit 2; fi
+if [[ "$target" == "wsl" && "$container" == "orbstack" ]]; then
+  echo "Invalid combination: target=wsl does not support container=orbstack" >&2
+  exit 2
+fi
+if [[ "$target" == "macos" && "$gpu" == "nvidia" ]]; then
+  echo "Invalid combination: target=macos does not support gpu=nvidia" >&2
+  exit 2
+fi
 if [[ "$target" == "wsl" && "$container" == "docker-engine" ]]; then echo "Warning: Docker Engine inside WSL is an advanced, non-default route." >&2; fi
 
 if [[ "$role" == "devbox" ]]; then

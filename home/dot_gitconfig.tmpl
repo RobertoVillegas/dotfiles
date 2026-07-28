@@ -1,8 +1,27 @@
-{{ if and .gitName .gitEmail -}}
+{{ if or (and .gitName .gitEmail) (eq .role "devbox") -}}
 [user]
+{{ if and .gitName .gitEmail -}}
 	name = {{ .gitName }}
 	email = {{ .gitEmail }}
 {{ end -}}
+{{ if eq .role "devbox" -}}
+{{ if eq .target "wsl" -}}
+	signingkey = ~/.ssh/devbox_gpu_github.pub
+{{ else -}}
+	signingkey = ~/.ssh/devbox_github.pub
+{{ end -}}
+{{ end -}}
+{{ end -}}
+{{ if eq .role "devbox" -}}
+[gpg]
+	format = ssh
+[gpg "ssh"]
+	allowedSignersFile = ~/.config/git/allowed_signers
+[commit]
+	gpgsign = true
+[tag]
+	gpgsign = true
+{{ end }}
 [core]
 	pager = delta
 [interactive]

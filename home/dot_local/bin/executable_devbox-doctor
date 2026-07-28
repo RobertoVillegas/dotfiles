@@ -111,7 +111,10 @@ if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/n
   pass "GitHub CLI OAuth is authenticated"
   gh_hosts="$HOME/.config/gh/hosts.yml"
   if [ -f "$gh_hosts" ]; then
-    gh_hosts_mode="$(stat -f '%Lp' "$gh_hosts" 2>/dev/null || stat -c '%a' "$gh_hosts" 2>/dev/null || true)"
+    case "$(uname -s)" in
+      Darwin) gh_hosts_mode="$(stat -f '%Lp' "$gh_hosts" 2>/dev/null || true)" ;;
+      *) gh_hosts_mode="$(stat -c '%a' "$gh_hosts" 2>/dev/null || true)" ;;
+    esac
     if [ "$gh_hosts_mode" = "600" ]; then
       pass "GitHub CLI headless credential file has mode 600"
     else

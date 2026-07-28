@@ -1,0 +1,5 @@
+{{- $identity := "devbox_github" -}}
+{{- if eq .target "wsl" -}}
+{{- $identity = "devbox_gpu_github" -}}
+{{- end -}}
+{{- output "sh" "-c" (printf "email=$(git config --global --includes --get user.email 2>/dev/null || true); key=$HOME/.ssh/%s.pub; if [ -n \"$email\" ] && [ -s \"$key\" ]; then printf '%%s %%s\\n' \"$email\" \"$(cat \"$key\")\"; fi" $identity) -}}

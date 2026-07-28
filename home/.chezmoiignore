@@ -35,3 +35,8 @@ Library
 {{ if and (eq .role "devbox") (ne .chezmoi.os "darwin") }}
 .local/bin/tailscale
 {{ end }}
+
+{{ if ne .role "devbox" }}
+.ssh/config
+.config/git/allowed_signers
+{{ end }}

@@ -1,0 +1,13 @@
+{{- if eq .target "wsl" -}}
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/devbox_gpu_github
+    IdentitiesOnly yes
+{{- else -}}
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/devbox_github
+    IdentitiesOnly yes
+{{- end }}

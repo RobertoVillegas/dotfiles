@@ -1,12 +1,18 @@
 {{- $profile := env "DOTFILES_PROFILE" | default "dev" -}}
 {{- $role := env "DOTFILES_ROLE" | default "workstation" -}}
 {{- $editor := env "DOTFILES_EDITOR" | default "zed" -}}
+{{- $target := env "DOTFILES_TARGET" | default "auto" -}}
+{{- $gpu := env "DOTFILES_GPU" | default "none" -}}
 {{- $container := env "DOTFILES_CONTAINER" | default "auto" -}}
+{{- $remoteOwner := env "DOTFILES_REMOTE_OWNER" | default "auto" -}}
 [data]
 profile = {{ $profile | quote }}
 role = {{ $role | quote }}
-editor = {{ $editor | quote }}
+target = {{ $target | quote }}
+gpu = {{ $gpu | quote }}
 container = {{ $container | quote }}
+remoteOwner = {{ $remoteOwner | quote }}
+editor = {{ $editor | quote }}
 personal = {{ eq (env "DOTFILES_PERSONAL") "true" }}
 gitName = {{ env "DOTFILES_GIT_NAME" | quote }}
 gitEmail = {{ env "DOTFILES_GIT_EMAIL" | quote }}

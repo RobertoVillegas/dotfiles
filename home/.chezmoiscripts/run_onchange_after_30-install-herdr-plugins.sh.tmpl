@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH="/home/linuxbrew/.linuxbrew/bin:$HOME/.local/bin:$PATH"
+
 {{- if eq .profile "dev" }}
 
 if ! command -v herdr >/dev/null 2>&1; then

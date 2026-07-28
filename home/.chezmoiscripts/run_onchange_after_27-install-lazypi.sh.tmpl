@@ -1,6 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 
+export PROTO_HOME="${PROTO_HOME:-$HOME/.proto}"
+export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$PATH"
+
 {{ if and (eq .profile "dev") (eq .role "devbox") -}}
 # Install the public catalog only. Pi credentials, sessions, memory, and other
 # machine data remain unmanaged under ~/.pi.

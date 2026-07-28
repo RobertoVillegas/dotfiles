@@ -1,0 +1,21 @@
+#!/bin/sh
+set -eu
+PYTORCH_IMAGE="${PYTORCH_IMAGE:-pytorch/pytorch:2.13.0-cuda13.0-cudnn9-runtime@sha256:db80a41f8428644cebcb3d75b0b62df334ab6c0e75785951eb25f48bfbd42407}"
+case "$PYTORCH_IMAGE" in *@sha256:*) ;; *)
+  echo 'PYTORCH_IMAGE must be pinned by digest' >&2
+  exit 2
+  ;;
+esac
+checkpoint_dir="${CHECKPOINT_DIR:-$HOME/checkpoints/rl-smoke}"
+case "$checkpoint_dir" in /mnt/*)
+  echo 'checkpoint directory must be in the Linux filesystem' >&2
+  exit 2
+  ;;
+esac
+mkdir -p "$checkpoint_dir"
+repo_smoke="${DOTFILES_SMOKE_DIR:-$HOME/.local/share/devbox/smoke}"
+cleanup() {
+  CHECKPOINT_DIR="$checkpoint_dir" PYTORCH_IMAGE="$PYTORCH_IMAGE" docker compose -f "$repo_smoke/compose.yaml" down >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
+CHECKPOINT_DIR="$checkpoint_dir" PYTORCH_IMAGE="$PYTORCH_IMAGE" docker compose -f "$repo_smoke/compose.yaml" up --abort-on-container-exit --exit-code-from cuda-smoke

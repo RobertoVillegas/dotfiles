@@ -5,8 +5,14 @@ failures=0
 warnings=0
 
 pass() { printf 'ok    %s\n' "$1"; }
-warn() { printf 'warn  %s\n' "$1"; warnings=$((warnings + 1)); }
-fail() { printf 'fail  %s\n' "$1"; failures=$((failures + 1)); }
+warn() {
+  printf 'warn  %s\n' "$1"
+  warnings=$((warnings + 1))
+}
+fail() {
+  printf 'fail  %s\n' "$1"
+  failures=$((failures + 1))
+}
 
 check_command() {
   if command -v "$1" >/dev/null 2>&1; then
@@ -18,7 +24,12 @@ check_command() {
 
 printf 'Devbox doctor\n\n'
 
-for command_name in git gh ghui jq yq mosh-server node npm proto herdr codex claude opencode pi tailscale ax agent-browser portless fastfetch btm btop lazydocker lazygit delta zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
+if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
+  wsl-doctor || failures=$((failures + 1))
+  gpu-doctor || failures=$((failures + 1))
+fi
+
+for command_name in git gh ghui jq yq mosh-server node npm proto herdr codex claude opencode pi ax agent-browser portless fastfetch btm btop lazydocker lazygit delta zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
   check_command "$command_name"
 done
 
@@ -26,15 +37,17 @@ if [ "$(uname -s)" = "Darwin" ]; then
   check_command mo
 fi
 
-if [ -f "$HOME/.pi/agent/compound-engineering/install-manifest.json" ] && \
-   [ -d "$HOME/.pi/agent/agents" ] && \
-   [ -d "$HOME/.pi/agent/skills" ]; then
+if [ -f "$HOME/.pi/agent/compound-engineering/install-manifest.json" ] &&
+  [ -d "$HOME/.pi/agent/agents" ] &&
+  [ -d "$HOME/.pi/agent/skills" ]; then
   pass "LazyPi Compound Engineering catalog is installed"
 else
   fail "LazyPi Compound Engineering catalog is incomplete"
 fi
 
-if command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
+if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
+  pass "Tailscale is owned by the Windows host"
+elif command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
   pass "Tailscale is connected"
   tailscale serve status 2>/dev/null || true
 else
@@ -69,7 +82,7 @@ done
 
 github_identity="$(ssh -G github.com 2>/dev/null | awk '$1 == "identityfile" { print $2; exit }')"
 case "$github_identity" in
-  '~/'*) github_identity="$HOME/${github_identity#\~/}" ;;
+  \~/*) github_identity="$HOME/${github_identity#\~/}" ;;
 esac
 if [ -n "$github_identity" ] && [ -f "$github_identity" ] && [ -f "$github_identity.pub" ]; then
   pass "Dedicated GitHub SSH key exists: $github_identity"
@@ -79,16 +92,16 @@ fi
 
 signing_key="$(git config --global --includes --get user.signingkey 2>/dev/null || true)"
 case "$signing_key" in
-  '~/'*) signing_key="$HOME/${signing_key#\~/}" ;;
+  \~/*) signing_key="$HOME/${signing_key#\~/}" ;;
 esac
 allowed_signers="$(git config --global --includes --get gpg.ssh.allowedSignersFile 2>/dev/null || true)"
 case "$allowed_signers" in
-  '~/'*) allowed_signers="$HOME/${allowed_signers#\~/}" ;;
+  \~/*) allowed_signers="$HOME/${allowed_signers#\~/}" ;;
 esac
-if [ "$(git config --global --includes --get commit.gpgsign 2>/dev/null || true)" = "true" ] && \
-   [ "$(git config --global --includes --get tag.gpgsign 2>/dev/null || true)" = "true" ] && \
-   [ "$(git config --global --includes --get gpg.format 2>/dev/null || true)" = "ssh" ] && \
-   [ -f "$signing_key" ] && [ -f "$allowed_signers" ]; then
+if [ "$(git config --global --includes --get commit.gpgsign 2>/dev/null || true)" = "true" ] &&
+  [ "$(git config --global --includes --get tag.gpgsign 2>/dev/null || true)" = "true" ] &&
+  [ "$(git config --global --includes --get gpg.format 2>/dev/null || true)" = "ssh" ] &&
+  [ -f "$signing_key" ] && [ -f "$allowed_signers" ]; then
   pass "Git SSH signing is enabled"
 else
   warn "Git SSH signing is not fully configured"

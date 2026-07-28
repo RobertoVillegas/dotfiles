@@ -1,0 +1,33 @@
+#!/bin/sh
+# shellcheck disable=SC1091,SC2015 # sourced OS metadata; ok/fail helpers always succeed
+set -u
+f=0
+w=0
+ok() { printf 'ok    %s\n' "$1"; }
+fail() {
+  printf 'fail  %s\n' "$1"
+  f=$((f + 1))
+}
+warn() {
+  printf 'warn  %s\n' "$1"
+  w=$((w + 1))
+}
+printf 'WSL doctor\n\n'
+if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then ok 'WSL detected'; else fail 'WSL not detected'; fi
+[ "$(ps -p 1 -o comm= 2>/dev/null | tr -d ' ')" = systemd ] && ok 'systemd is PID 1' || fail 'systemd is not PID 1'
+. /etc/os-release
+ok "Ubuntu release: ${PRETTY_NAME:-unknown}"
+case "$(df -T "$HOME" | awk 'NR==2{print $2}')" in ext4) ok 'HOME is on ext4' ;; *) fail 'HOME is not on ext4' ;; esac
+case "$HOME" in /mnt/*) fail 'HOME is under /mnt' ;; *) ok 'HOME is in Linux filesystem' ;; esac
+bad="$(find "$HOME/src" "$HOME/work" -maxdepth 2 -type l -lname '/mnt/c/*' 2>/dev/null | head -n1)"
+[ -z "$bad" ] && ok 'active workspace roots do not link to /mnt/c' || fail "workspace links to /mnt/c: $bad"
+ok "resources: $(nproc) CPUs, $(awk '/MemTotal/{printf "%.1f GiB",$2/1048576}' /proc/meminfo), swap $(awk '/SwapTotal/{printf "%.1f GiB",$2/1048576}' /proc/meminfo)"
+getent hosts github.com >/dev/null 2>&1 && ok 'DNS resolves' || fail 'DNS resolution failed'
+timedatectl show -p NTPSynchronized --value 2>/dev/null | grep -qx yes && ok 'clock synchronized' || warn 'clock not reported synchronized'
+systemctl is-active --quiet ssh && ok 'ssh.service active' || fail 'ssh.service inactive'
+ss -lnt | awk '$4 ~ /:2222$/{found=1} END{exit !found}' && ok 'sshd listens on 2222' || fail 'port 2222 not listening'
+printf 'remote network owner: windows\ntailscale daemon expected in WSL: no\nsshd expected in WSL: yes\n'
+if systemctl list-unit-files tailscaled.service 2>/dev/null | grep -q tailscaled; then fail 'tailscaled exists in WSL'; else ok 'no WSL tailscale daemon'; fi
+if command -v docker >/dev/null 2>&1; then docker info >/dev/null 2>&1 && ok 'Docker Desktop daemon reachable' || fail 'Docker CLI exists but Docker Desktop integration/daemon is unavailable'; else fail 'Docker CLI absent (enable Docker Desktop WSL integration)'; fi
+printf '\n%d failure(s), %d warning(s)\n' "$f" "$w"
+[ "$f" -eq 0 ]

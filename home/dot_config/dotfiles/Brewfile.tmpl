@@ -110,7 +110,7 @@ cask "orbstack"
 {{- end }}
 {{- end }}
 
-{{- if and (eq .chezmoi.os "linux") (eq .profile "dev") (eq .role "devbox") (or (eq .container "auto") (eq .container "docker")) }}
+{{- if and (eq .chezmoi.os "linux") (eq .profile "dev") (eq .role "devbox") (eq .container "docker-engine") }}
 
 # The Docker daemon remains distro-managed; these provide portable clients.
 brew "docker"

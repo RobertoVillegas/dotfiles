@@ -29,7 +29,7 @@ if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>
   gpu-doctor || failures=$((failures + 1))
 fi
 
-for command_name in git gh ghui jq yq mosh-server node npm proto herdr codex claude opencode pi tailscale ax agent-browser portless fastfetch btm btop lazydocker lazygit delta zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
+for command_name in git gh ghui jq yq mosh-server node npm proto herdr codex claude opencode pi ax agent-browser portless fastfetch btm btop lazydocker lazygit delta zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
   check_command "$command_name"
 done
 
@@ -45,7 +45,9 @@ else
   fail "LazyPi Compound Engineering catalog is incomplete"
 fi
 
-if command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
+if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
+  pass "Tailscale is owned by the Windows host"
+elif command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
   pass "Tailscale is connected"
   tailscale serve status 2>/dev/null || true
 else

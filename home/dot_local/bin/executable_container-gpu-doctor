@@ -1,6 +1,6 @@
 #!/bin/sh
 set -u
-image="${CUDA_IMAGE:?Set CUDA_IMAGE to an official NVIDIA CUDA image pinned by digest}"
+image="${CUDA_IMAGE:-nvidia/cuda:13.0.2-base-ubuntu24.04@sha256:605fb0c8acf8674e164d822da8a8521f3a655056e569f0899e72ae940e1fe7dc}"
 printf 'Container GPU doctor\nimage=%s\n' "$image"
 command -v docker >/dev/null 2>&1 || {
   echo 'fail  Docker CLI absent'

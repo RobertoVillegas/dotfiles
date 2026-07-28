@@ -14,4 +14,8 @@ case "$checkpoint_dir" in /mnt/*)
 esac
 mkdir -p "$checkpoint_dir"
 repo_smoke="${DOTFILES_SMOKE_DIR:-$HOME/.local/share/devbox/smoke}"
+cleanup() {
+  CHECKPOINT_DIR="$checkpoint_dir" PYTORCH_IMAGE="$PYTORCH_IMAGE" docker compose -f "$repo_smoke/compose.yaml" down >/dev/null 2>&1 || true
+}
+trap cleanup EXIT INT TERM
 CHECKPOINT_DIR="$checkpoint_dir" PYTORCH_IMAGE="$PYTORCH_IMAGE" docker compose -f "$repo_smoke/compose.yaml" up --abort-on-container-exit --exit-code-from cuda-smoke

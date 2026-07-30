@@ -22,9 +22,11 @@ clients but leaves the daemon to the distribution package manager.
 The CLI toolbox includes Fastfetch, bottom, btop, dust, duf, procs, just,
 Watchexec, Hyperfine, yq, ShellCheck, shfmt, Git LFS, and tealdeer. LazyGit and
 Delta cover local Git work, ghui covers GitHub pull requests and Actions, and
-LazyDocker provides an interactive view of Docker and Compose. Fastfetch is
-available on demand and is not run automatically during SSH login. macOS also
-gets Mole's `mo` command for interactive maintenance and disk analysis.
+LazyDocker provides an interactive view of Docker and Compose. Druk is a
+terminal code editor installed from its pinned official installer into
+`~/.druk/bin`. Fastfetch is available on demand and is not run automatically
+during SSH login. macOS also gets Mole's `mo` command for interactive
+maintenance and disk analysis.
 
 LazyPi is installed through its pinned official installer. It provisions the
 public extensions, themes, agents, skills, and Compound Engineering output, but

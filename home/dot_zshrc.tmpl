@@ -20,6 +20,7 @@ export PNPM_HOME="${PNPM_HOME:-$HOME/.local/share/pnpm}"
 export BUN_INSTALL="$HOME/.bun"
 [[ -d "$BUN_INSTALL/bin" ]] && export PATH="$BUN_INSTALL/bin:$PATH"
 [[ -d "$HOME/go/bin" ]] && export PATH="$HOME/go/bin:$PATH"
+[[ -d "$HOME/.druk/bin" ]] && export PATH="$HOME/.druk/bin:$PATH"
 
 # Homebrew libraries used by local builds.
 if command -v brew >/dev/null 2>&1; then

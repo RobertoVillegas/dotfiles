@@ -1,5 +1,7 @@
+{{- /* Each host names its own signing key, so trust ~/.gitconfig.local first and
+       only fall back to the conventional name when it has not been set up yet. */ -}}
 {{- $identity := "devbox_github" -}}
 {{- if eq .target "wsl" -}}
 {{- $identity = "devbox_gpu_github" -}}
 {{- end -}}
-{{- output "sh" "-c" (printf "email=$(git config --global --includes --get user.email 2>/dev/null || true); key=$HOME/.ssh/%s.pub; if [ -n \"$email\" ] && [ -s \"$key\" ]; then printf '%%s %%s\\n' \"$email\" \"$(cat \"$key\")\"; fi" $identity) -}}
+{{- output "sh" "-c" (printf "email=$(git config --global --includes --get user.email 2>/dev/null || true); key=$(git config --global --includes --get user.signingkey 2>/dev/null || true); case \"$key\" in \\~/*) key=\"$HOME/${key#\\~/}\" ;; '') key=$HOME/.ssh/%s.pub ;; esac; if [ -n \"$email\" ] && [ -s \"$key\" ]; then printf '%%s %%s\\n' \"$email\" \"$(cat \"$key\")\"; fi" $identity) -}}

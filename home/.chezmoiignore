@@ -36,7 +36,10 @@ Library
 .local/bin/tailscale
 {{ end }}
 
-{{ if ne .role "devbox" }}
+{{ if ne .target "wsl" }}
 .ssh/config
+{{ end }}
+
+{{ if ne .role "devbox" }}
 .config/git/allowed_signers
 {{ end }}

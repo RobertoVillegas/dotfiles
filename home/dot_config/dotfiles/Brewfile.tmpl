@@ -77,6 +77,7 @@ brew "anomalyco/tap/opencode", trusted: true
 {{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") (eq .role "workstation") }}
 
 # macOS essentials.
+tap "productdevbook/tap"
 cask "1password"
 cask "1password-cli"
 cask "ghostty"
@@ -94,7 +95,7 @@ cask "datagrip"
 cask "figma"
 cask "lazyworktree"
 cask "paper-design"
-cask "portkiller"
+cask "productdevbook/tap/portkiller", trusted: true
 cask "postman"
 cask "t3-code"
 cask "yaak"

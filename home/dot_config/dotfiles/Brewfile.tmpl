@@ -130,10 +130,14 @@ brew "docker-compose"
 
 {{- if and (eq .chezmoi.os "darwin") (eq .role "workstation") .personal }}
 brew "mas"
+cask "bartender"
+cask "batfi"
+cask "cap"
 cask "cleanshot"
 cask "cryptomator"
 cask "discord"
 cask "reflex-app"
+cask "rocket"
 cask "scroll-reverser"
 cask "spotify"
 mas "Flow", id: 1423210932

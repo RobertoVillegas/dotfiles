@@ -68,6 +68,7 @@ brew "tealdeer"
 brew "tokei"
 brew "watchexec"
 brew "watchman"
+brew "worktrunk"
 brew "yq"
 brew "anomalyco/tap/opencode", trusted: true
 {{- end }}
@@ -79,15 +80,21 @@ cask "1password"
 cask "1password-cli"
 cask "ghostty"
 cask "handy"
+cask "lasso-app"
 cask "font-jetbrains-mono-nerd-font"
 cask "raycast"
 cask "tailscale-app"
 cask "zen"
 
 cask "bruno"
+cask "codexbar"
 cask "datagrip"
+cask "figma"
+cask "lazyworktree"
 cask "paper-design"
+cask "portkiller"
 cask "postman"
+cask "t3-code"
 
 {{- if or (eq .editor "zed") (eq .editor "both") }}
 cask "zed"
@@ -120,6 +127,7 @@ brew "docker-compose"
 
 {{- if and (eq .chezmoi.os "darwin") (eq .role "workstation") .personal }}
 brew "mas"
+cask "discord"
 cask "spotify"
 mas "Flow", id: 1423210932
 {{- end }}

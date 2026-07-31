@@ -45,6 +45,7 @@ brew "ffmpeg"
 brew "git-lfs"
 brew "gradle"
 brew "glow"
+brew "go"
 brew "herdr"
 brew "kitlangton/tap/ghui", trusted: true
 brew "modem-dev/tap/hunk", trusted: true
@@ -88,6 +89,7 @@ cask "zen"
 
 cask "bruno"
 cask "codexbar"
+cask "cursor"
 cask "datagrip"
 cask "figma"
 cask "lazyworktree"
@@ -95,6 +97,7 @@ cask "paper-design"
 cask "portkiller"
 cask "postman"
 cask "t3-code"
+cask "yaak"
 
 {{- if or (eq .editor "zed") (eq .editor "both") }}
 cask "zed"
@@ -127,7 +130,11 @@ brew "docker-compose"
 
 {{- if and (eq .chezmoi.os "darwin") (eq .role "workstation") .personal }}
 brew "mas"
+cask "cleanshot"
+cask "cryptomator"
 cask "discord"
+cask "reflex-app"
+cask "scroll-reverser"
 cask "spotify"
 mas "Flow", id: 1423210932
 {{- end }}

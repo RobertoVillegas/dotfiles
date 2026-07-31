@@ -21,4 +21,16 @@ if ! herdr plugin list --json |
   echo "Installing termscope..."
   herdr plugin install iurysza/termscope --yes
 fi
+
+if ! herdr plugin list --json |
+  jq -e '.result.plugins[]? | select(.plugin_id == "worktrunk")' >/dev/null; then
+  echo "Installing herdr-worktrunk..."
+  herdr plugin install devashish2203/herdr-worktrunk --yes
+fi
+
+if ! herdr plugin list --json |
+  jq -e '.result.plugins[]? | select(.plugin_id == "fullerzz.sesh")' >/dev/null; then
+  echo "Installing herdr-plugin-sesh..."
+  herdr plugin install fullerzz/herdr-plugin-sesh --yes
+fi
 {{- end }}

@@ -11,3 +11,23 @@ dark_name = "catppuccin"
 
 [ui.toast]
 delivery = "herdr"
+
+# Worktrees via the worktrunk plugin (wt hooks included). A custom binding
+# takes precedence over herdr's built-in new-worktree action on the same key.
+[[keys.command]]
+key = "prefix+shift+g"
+type = "plugin_action"
+command = "worktrunk.open"
+description = "Worktree: switch / create from default branch"
+
+[[keys.command]]
+key = "prefix+shift+c"
+type = "plugin_action"
+command = "worktrunk.open-current"
+description = "Worktree: switch / create from current branch"
+
+[[keys.command]]
+key = "prefix+shift+d"
+type = "plugin_action"
+command = "worktrunk.remove"
+description = "Worktree: remove"

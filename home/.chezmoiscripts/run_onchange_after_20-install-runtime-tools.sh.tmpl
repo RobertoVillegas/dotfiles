@@ -13,10 +13,12 @@ npm install --global \
   @fission-ai/openspec \
   @google/gemini-cli \
   @openai/codex \
+  @vercel/before-and-after \
 {{- if eq .role "devbox" }}
   agent-browser \
 {{- end }}
   bash-language-server \
+  dev3000 \
 {{- if eq .role "devbox" }}
   portless \
 {{- end }}

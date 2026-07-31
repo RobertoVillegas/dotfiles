@@ -70,6 +70,9 @@ unset _uv_comp
 
 [[ -r "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
 
+# worktrunk: shell integration gives wt switch its directory jump.
+command -v wt >/dev/null 2>&1 && eval "$(wt config shell init zsh)"
+
 brewm() {
   brew update || return 1
   brew upgrade

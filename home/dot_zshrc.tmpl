@@ -10,15 +10,6 @@ fi
 autoload -Uz promptinit && promptinit
 prompt pure 2>/dev/null || true
 
-# Package manager homes.
-{{ if eq .chezmoi.os "darwin" -}}
-export PNPM_HOME="${PNPM_HOME:-$HOME/Library/pnpm}"
-{{ else -}}
-export PNPM_HOME="${PNPM_HOME:-$HOME/.local/share/pnpm}"
-{{ end -}}
-[[ -d "$PNPM_HOME" ]] && export PATH="$PNPM_HOME:$PATH"
-export BUN_INSTALL="$HOME/.bun"
-[[ -d "$BUN_INSTALL/bin" ]] && export PATH="$BUN_INSTALL/bin:$PATH"
 [[ -d "$HOME/go/bin" ]] && export PATH="$HOME/go/bin:$PATH"
 [[ -d "$HOME/.druk/bin" ]] && export PATH="$HOME/.druk/bin:$PATH"
 
@@ -68,8 +59,6 @@ if command -v uv >/dev/null 2>&1; then
 fi
 unset _uv_comp
 
-[[ -r "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
-
 # worktrunk: shell integration gives wt switch its directory jump.
 command -v wt >/dev/null 2>&1 && eval "$(wt config shell init zsh)"
 
@@ -81,5 +70,6 @@ brewm() {
   brew autoremove
 }
 
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$PATH"
+# Keep activation last so later PATH changes cannot override mise-managed tools.
+command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh)"
 typeset -U path PATH

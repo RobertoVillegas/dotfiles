@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 set -eu
 
-export PROTO_HOME="${PROTO_HOME:-$HOME/.proto}"
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$PATH"
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
 
 {{ if and (eq .profile "dev") (eq .role "devbox") -}}
 agent-browser install

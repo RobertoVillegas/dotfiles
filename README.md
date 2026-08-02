@@ -2,8 +2,8 @@
 
 Mi setup reproducible para una workstation o devbox en macOS y Linux. Usa
 [chezmoi](https://www.chezmoi.io/) para administrar la configuración, Homebrew
-para herramientas del sistema y [Proto](https://moonrepo.dev/proto) para Node,
-pnpm y Bun.
+para herramientas del sistema y [mise](https://mise.jdx.dev/) para Node, pnpm,
+Bun y CLIs de los registros de lenguajes.
 
 ## Empezar
 
@@ -36,7 +36,7 @@ ejemplo, `dot_zshrc.tmpl` produce `~/.zshrc`, mientras que `executable_` y
 
 ## Workstation
 
-La workstation incluye Zsh, Oh My Zsh, Pure, Ghostty, Git, Proto, herramientas
+La workstation incluye Zsh, Oh My Zsh, Pure, Ghostty, Git, mise, herramientas
 de desarrollo, agentes de código y aplicaciones como Raycast, 1Password,
 Tailscale y Zen. Durante el setup se puede elegir Zed, VS Code, ambos o ninguno.
 Las skills portables de Herdr, descubrimiento y documentación actual se
@@ -54,7 +54,7 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 
 - SSH y Mosh sobre Tailscale.
 - Herdr, Hunk, tmux y herramientas de terminal.
-- Node, npm, pnpm y Bun administrados por Proto.
+- Node LTS, npm, pnpm, Bun y CLIs globales administrados por mise.
 - Codex, Claude Code, OpenCode, Pi y LazyPi.
 - Ax y Agent Browser para acceso y automatización web.
 - Context7 por CLI para consultar documentación actual, sin MCP.
@@ -79,7 +79,7 @@ devbox-doctor
 
 ## Minimal
 
-Para una máquina ligera con shell, Git, tmux, Proto y utilidades de terminal:
+Para una máquina ligera con shell, Git, tmux, mise y utilidades de terminal:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/RobertoVillegas/dotfiles/main/bootstrap | bash -s -- --minimal
@@ -104,6 +104,12 @@ DOTFILES_GIT_NAME="Your Name" DOTFILES_GIT_EMAIL="you@example.com" ./bootstrap
 ```sh
 chezmoi update
 ```
+
+Las versiones y CLIs administradas por mise se declaran en
+`home/dot_config/mise/config.toml.tmpl`. Para agregar una CLI de npm de forma
+reproducible, añade una entrada como `"npm:cline" = "latest"`; una instalación
+manual con `npm install -g` pertenece a la versión activa de Node y no pasa a
+formar parte del inventario declarativo.
 
 Para revisar o reinstalar sólo los paquetes de Homebrew:
 

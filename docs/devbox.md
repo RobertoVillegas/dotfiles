@@ -7,7 +7,7 @@ development host without installing workstation or personal applications.
 ./bootstrap --devbox
 ```
 
-The command is idempotent. Existing Homebrew packages, Oh My Zsh, proto,
+The command is idempotent. Existing Homebrew packages, Oh My Zsh, mise,
 Tailscale, OrbStack, and agent CLIs are reused or updated in place.
 
 ## Automated setup
@@ -45,8 +45,9 @@ devbox-doctor
 
 ## JavaScript toolchain
 
-Proto installs and pins Node, npm, pnpm, and Bun from `~/.proto/.prototools`.
-Proto is the version manager; pnpm and Bun remain available side by side. For
+mise installs the latest Node LTS line, pnpm, Bun, and global npm CLIs from
+`~/.config/mise/config.toml`. It also honors Node's idiomatic version files such
+as `.nvmrc` and `.node-version`. pnpm and Bun remain available side by side. For
 each project, follow its `packageManager` field and existing lockfile. Do not
 create a second lockfile or migrate package managers implicitly.
 

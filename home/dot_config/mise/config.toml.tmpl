@@ -1,0 +1,40 @@
+[tools]
+# JavaScript runtimes and package managers.
+node = "lts"
+pnpm = "10.16.1"
+bun = "1.3.1"
+
+{{- if eq .profile "dev" }}
+# Coding agents and their companion tools.
+"npm:@earendil-works/pi-coding-agent" = "latest"
+"npm:@fission-ai/openspec" = "latest"
+"npm:@google/gemini-cli" = "latest"
+"npm:@kilocode/cli" = "latest"
+"npm:@kitlangton/tailcode" = "latest"
+"npm:@openai/codex" = "latest"
+"npm:@vercel/before-and-after" = "latest"
+"npm:agent-browser" = "latest"
+"npm:cline" = "latest"
+"npm:critique" = "latest"
+"npm:dev3000" = "latest"
+"npm:happy" = { version = "latest", allow_builds = ["happy"] }
+{{- if eq .role "devbox" }}
+"npm:portless" = "latest"
+{{- end }}
+
+# Service and application CLIs.
+"npm:@kapso/cli" = "latest"
+"npm:@modelcontextprotocol/server-filesystem" = "latest"
+"npm:@nestjs/cli" = "latest"
+"npm:@steipete/summarize" = "latest"
+
+# Language servers and compiler tooling.
+"npm:bash-language-server" = "latest"
+"npm:pyright" = "latest"
+"npm:typescript" = "latest"
+"npm:typescript-language-server" = "latest"
+{{- end }}
+
+[settings]
+idiomatic_version_file_enable_tools = ["node"]
+npm.shell_out = true

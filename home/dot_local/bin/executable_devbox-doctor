@@ -29,7 +29,7 @@ if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>
   gpu-doctor || failures=$((failures + 1))
 fi
 
-for command_name in git gh ghui jq yq mosh-server node npm proto herdr codex claude opencode pi ax agent-browser portless fastfetch btm btop lazydocker lazygit delta druk zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
+for command_name in git gh ghui jq yq mosh-server node npm pnpm bun mise herdr codex cline claude opencode pi ax agent-browser portless fastfetch btm btop lazydocker lazygit delta druk zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
   check_command "$command_name"
 done
 

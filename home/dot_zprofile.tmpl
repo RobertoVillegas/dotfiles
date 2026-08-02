@@ -12,8 +12,7 @@ fi
 [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 {{ end -}}
 
-# Homebrew and OrbStack may prepend their own runtimes during login. Restore
-# Proto precedence here as well as in .zshenv so non-interactive SSH commands
-# and headless agents use the pinned toolchain without requiring .zshrc.
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$HOME/.local/bin:$PATH"
+# Keep mise shims available to non-interactive SSH commands and headless agents.
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:$PATH"
 typeset -U path PATH

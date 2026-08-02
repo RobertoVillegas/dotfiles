@@ -1,31 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export PROTO_HOME="${PROTO_HOME:-$HOME/.proto}"
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PATH"
+# Re-run whenever the declarative tool inventory changes.
+# mise config: {{ includeTemplate "dot_config/mise/config.toml.tmpl" . | sha256sum }}
 
-proto install --config-mode global --yes
+if ! command -v mise >/dev/null 2>&1; then
+  export PATH="/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:$PATH"
+fi
+command -v mise >/dev/null 2>&1 || {
+  echo "mise is unavailable; install the Brewfile first." >&2
+  exit 1
+}
+
+cd "$HOME"
+# npm.shell_out requires npm to exist before mise installs npm-backed tools.
+mise install node pnpm bun
+mise install
+
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:$PATH"
 
 {{- if eq .profile "dev" }}
-
-npm install --global \
-  @earendil-works/pi-coding-agent \
-  @fission-ai/openspec \
-  @google/gemini-cli \
-  @openai/codex \
-  @vercel/before-and-after \
-{{- if eq .role "devbox" }}
-  agent-browser \
-{{- end }}
-  bash-language-server \
-  dev3000 \
-{{- if eq .role "devbox" }}
-  portless \
-{{- end }}
-  pyright \
-  typescript \
-  typescript-language-server
-
 if ! command -v claude >/dev/null 2>&1; then
   curl -fsSL https://claude.ai/install.sh | bash
 fi

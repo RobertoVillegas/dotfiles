@@ -1,16 +1,15 @@
-export PROTO_HOME="$HOME/.proto"
-export npm_config_prefix="$PROTO_HOME/tools/node/globals"
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
 {{ if eq .chezmoi.os "darwin" -}}
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 {{ else -}}
-export PATH="$PROTO_HOME/shims:$PROTO_HOME/bin:$PROTO_HOME/tools/node/globals/bin:$HOME/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
+export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
 {{ end -}}
 {{ if and (eq .target "wsl") (eq .gpu "nvidia") -}}
 [[ -d /usr/lib/wsl/lib ]] && export PATH="/usr/lib/wsl/lib:$PATH"
 {{ end -}}
 
 # Keep OrbStack's clients available without letting its bundled runtimes
-# override the versions selected by Proto.
+# override the versions selected by mise.
 [[ -d "$HOME/.orbstack/bin" ]] && export PATH="$PATH:$HOME/.orbstack/bin"
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 

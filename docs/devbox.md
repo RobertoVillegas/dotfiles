@@ -14,7 +14,7 @@ Tailscale, OrbStack, and agent CLIs are reused or updated in place.
 
 The role installs the portable development toolchain, Mosh, Hunk, Herdr, the
 `herdr-file-viewer` and Termscope plugins, agent CLIs, Ax, Agent Browser,
-Portless, the shared devbox context, global networking, browser-automation,
+the shared devbox context, global networking, browser-automation,
 Herdr, skill-discovery, and Context7 documentation skills, and LazyPi's complete
 public Pi catalog. macOS receives Tailscale and OrbStack; Linux receives Docker
 clients but leaves the daemon to the distribution package manager.
@@ -32,6 +32,10 @@ LazyPi is installed through its pinned official installer. It provisions the
 public extensions, themes, agents, skills, and Compound Engineering output, but
 the dotfiles never manage `~/.pi` itself. Pi credentials, sessions, memory,
 backups, and local settings remain machine-private.
+
+Antigravity CLI is installed from Google's native installer as `agy` in
+`~/.local/bin`. The binary manages its own updates; authentication and local
+session data remain machine-private.
 
 On Linux, install and enroll the distro-supported Tailscale package and install
 Docker Engine through the distribution's supported packages. The profile does
@@ -163,18 +167,8 @@ git config user.email WORK_EMAIL
 
 ## Services
 
-For compatible HTTP development servers, Portless assigns a collision-free
-local URL and registers the private Tailscale mapping without changing the
-repository:
-
-```sh
-portless run --tailscale
-portless list
-tailscale serve status
-```
-
-The networking skill falls back to direct Tailscale Serve for incompatible HTTP
-servers and uses it for raw TCP services:
+Bind development servers to loopback, verify them locally, and expose only the
+requested port through Tailscale Serve:
 
 ```sh
 tailscale serve --bg --https=3000 http://127.0.0.1:3000

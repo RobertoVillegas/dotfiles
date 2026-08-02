@@ -55,7 +55,7 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 - SSH y Mosh sobre Tailscale.
 - Herdr, Hunk, tmux y herramientas de terminal.
 - Node LTS, npm, pnpm, Bun y CLIs globales administrados por mise.
-- Codex, Claude Code, OpenCode, Pi y LazyPi.
+- Antigravity, Codex, Claude Code, OpenCode, Pi y LazyPi.
 - Ax y Agent Browser para acceso y automatización web.
 - Context7 por CLI para consultar documentación actual, sin MCP.
 - Skills globales para Herdr, descubrimiento y documentación.
@@ -63,7 +63,7 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 - LazyGit y Delta para Git, ghui para pull requests y LazyDocker para contenedores.
 - Druk como editor de código en la terminal.
 - Mole (`mo`) para mantenimiento y análisis interactivo de macOS.
-- Portless y Tailscale Serve para compartir servicios de desarrollo.
+- Tailscale Serve para compartir servicios de desarrollo.
 - OrbStack en macOS o clientes de Docker en Linux.
 
 ```sh
@@ -107,7 +107,7 @@ chezmoi update
 
 Las versiones y CLIs administradas por mise se declaran en
 `home/dot_config/mise/config.toml.tmpl`. Para agregar una CLI de npm de forma
-reproducible, añade una entrada como `"npm:cline" = "latest"`; una instalación
+reproducible, añade una entrada como `"npm:dev3000" = "latest"`; una instalación
 manual con `npm install -g` pertenece a la versión activa de Node y no pasa a
 formar parte del inventario declarativo.
 

@@ -5,6 +5,13 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 
 if ! command -v agy >/dev/null 2>&1; then
-  curl -fsSL https://antigravity.google/cli/install.sh | bash
+  target_dir="$HOME/.local/bin"
+  setup_home="$(mktemp -d)"
+  trap 'rm -rf "$setup_home"' EXIT
+
+  # The native setup appends PATH entries to shell profiles. chezmoi already
+  # owns PATH, so isolate that setup work while installing the real binary.
+  curl -fsSL https://antigravity.google/cli/install.sh |
+    HOME="$setup_home" bash -s -- --dir "$target_dir"
 fi
 {{- end }}

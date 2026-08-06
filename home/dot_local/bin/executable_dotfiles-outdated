@@ -15,14 +15,28 @@ unknown=0
 
 strip_v() { printf '%s' "${1#v}"; }
 
+# Unauthenticated api.github.com allows 60 requests an hour, which this report
+# can exhaust on its own. Prefer gh, which is authenticated and gets 5000.
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+	use_gh=1
+else
+	use_gh=0
+fi
+
+github_json() {
+	if [ "$use_gh" = 1 ]; then
+		gh api "$1" 2>/dev/null
+	else
+		curl -fsSL "https://api.github.com/$1" 2>/dev/null
+	fi
+}
+
 github_latest_release() {
-	curl -fsSL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null |
-		jq -r '.tag_name // empty' 2>/dev/null
+	github_json "repos/$1/releases/latest" | jq -r '.tag_name // empty' 2>/dev/null
 }
 
 github_latest_tag() {
-	curl -fsSL "https://api.github.com/repos/$1/tags" 2>/dev/null |
-		jq -r '.[0].name // empty' 2>/dev/null
+	github_json "repos/$1/tags" | jq -r '.[0].name // empty' 2>/dev/null
 }
 
 # name, current, latest, where the pin lives

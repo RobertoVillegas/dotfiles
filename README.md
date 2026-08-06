@@ -105,6 +105,17 @@ DOTFILES_GIT_NAME="Your Name" DOTFILES_GIT_EMAIL="you@example.com" ./bootstrap
 chezmoi update
 ```
 
+El perfil devbox además se actualiza solo una vez al día con
+`~/.local/bin/dotfiles-autoupdate`, programado por un agente de launchd en macOS
+y por un timer de usuario de systemd en Linux. Ambos recuperan la corrida
+perdida si la máquina estaba apagada. La bitácora vive en
+`~/.local/state/dotfiles/autoupdate.log`:
+
+```sh
+tail -f ~/.local/state/dotfiles/autoupdate.log   # ver la última corrida
+dotfiles-autoupdate                              # forzar una ahora
+```
+
 Las versiones y CLIs administradas por mise se declaran en
 `home/dot_config/mise/config.toml.tmpl`. Para agregar una CLI de npm de forma
 reproducible, añade una entrada como `"npm:dev3000" = "latest"`; una instalación

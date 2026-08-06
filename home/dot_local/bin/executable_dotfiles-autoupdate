@@ -1,0 +1,43 @@
+#!/bin/sh
+set -u
+
+# Scheduled `chezmoi update` for the devbox profile. Pulls the dotfiles repo and
+# applies it, so the scripts that track upstream versions (Prime Agent, mise
+# tools) pick up releases without a manual sync. Driven by a launchd agent on
+# macOS and a systemd user timer on Linux.
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+log_file="$state_dir/autoupdate.log"
+lock_dir="$state_dir/autoupdate.lock"
+
+mkdir -p "$state_dir"
+
+timestamp() { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
+
+# mkdir is atomic, so it doubles as a lock against overlapping runs.
+if ! mkdir "$lock_dir" 2>/dev/null; then
+  printf '%s skipped: another run holds the lock\n' "$(timestamp)" >>"$log_file"
+  exit 0
+fi
+trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT HUP INT TERM
+
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+PATH="$HOME/.local/bin:$MISE_DATA_DIR/shims:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
+export PATH
+
+if ! command -v chezmoi >/dev/null 2>&1; then
+  printf '%s failed: chezmoi is not on PATH\n' "$(timestamp)" >>"$log_file"
+  exit 1
+fi
+
+printf '\n=== %s chezmoi update ===\n' "$(timestamp)" >>"$log_file"
+status=0
+chezmoi update >>"$log_file" 2>&1 || status=$?
+printf '=== %s exit %d ===\n' "$(timestamp)" "$status" >>"$log_file"
+
+# Keep the log bounded without pulling in logrotate.
+if [ "$(wc -l <"$log_file")" -gt 2000 ]; then
+  tail -n 1000 "$log_file" >"$log_file.new" && mv "$log_file.new" "$log_file"
+fi
+
+exit "$status"

@@ -1,0 +1,7 @@
+[Unit]
+Description=Pull and apply the dotfiles repository
+Documentation=https://github.com/RobertoVillegas/dotfiles
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/dotfiles-autoupdate

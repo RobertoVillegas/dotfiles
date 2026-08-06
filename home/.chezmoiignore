@@ -1,5 +1,13 @@
 {{ if or (ne .chezmoi.os "darwin") (ne .profile "dev") (ne .role "workstation") (and (ne .editor "vscode") (ne .editor "both")) }}
-Library
+Library/Application Support
+{{ end }}
+
+{{ if or (ne .chezmoi.os "darwin") (ne .profile "dev") (ne .role "devbox") }}
+Library/LaunchAgents
+{{ end }}
+
+{{ if or (eq .chezmoi.os "darwin") (ne .profile "dev") (ne .role "devbox") }}
+.config/systemd
 {{ end }}
 
 {{ if or (ne .profile "dev") (ne .role "workstation") (and (ne .editor "zed") (ne .editor "both")) }}

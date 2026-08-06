@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Re-run whenever the runner or the scheduler unit changes.
+# runner: {{ include "dot_local/bin/executable_dotfiles-autoupdate" | sha256sum }}
+# launchd: {{ includeTemplate "private_Library/LaunchAgents/local.dotfiles-autoupdate.plist.tmpl" . | sha256sum }}
+# systemd: {{ include "dot_config/systemd/user/dotfiles-autoupdate.timer" | sha256sum }}{{ include "dot_config/systemd/user/dotfiles-autoupdate.service" | sha256sum }}
+
+{{ if and (eq .profile "dev") (eq .role "devbox") -}}
+{{ if eq .chezmoi.os "darwin" -}}
+label="local.dotfiles-autoupdate"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+uid="$(id -u)"
+
+for domain in "gui/$uid" "user/$uid"; do
+  launchctl bootout "$domain/$label" 2>/dev/null || true
+done
+
+# An SSH session is not in the Aqua domain, so gui/ bootstrapping fails there;
+# user/ is the fallback that still gives launchd a calendar-driven agent.
+if ! launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null &&
+  ! launchctl bootstrap "user/$uid" "$plist" 2>/dev/null; then
+  echo "warn: could not load $label; run 'launchctl bootstrap gui/$uid $plist' from a desktop session" >&2
+fi
+{{ else -}}
+if ! systemctl --user show-environment >/dev/null 2>&1; then
+  echo "warn: no systemd user manager; dotfiles-autoupdate.timer was not enabled" >&2
+  exit 0
+fi
+
+systemctl --user daemon-reload
+systemctl --user enable --now dotfiles-autoupdate.timer
+{{ end -}}
+{{ else -}}
+:
+{{ end -}}

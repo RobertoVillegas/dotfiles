@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily dotfiles update
+
+[Timer]
+OnCalendar=daily
+# WSL2 stops the VM with the last session and linger is off, so a missed run has
+# to be caught up on the next boot instead of silently skipped.
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

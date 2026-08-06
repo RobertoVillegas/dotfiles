@@ -55,7 +55,7 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 - SSH y Mosh sobre Tailscale.
 - Herdr, Hunk, tmux y herramientas de terminal.
 - Node LTS, npm, pnpm, Bun y CLIs globales administrados por mise.
-- Antigravity, Codex, Claude Code, OpenCode, Pi y LazyPi.
+- Antigravity, Codex, Claude Code, OpenCode, Pi, LazyPi y Prime Agent.
 - Ax y Agent Browser para acceso y automatización web.
 - Context7 por CLI para consultar documentación actual, sin MCP.
 - Skills globales para Herdr, descubrimiento y documentación.

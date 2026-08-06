@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{ if eq .profile "dev" -}}
+export PRIME_AGENT_VERSION="0.7.0"
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:$PATH"
+
+# Prime Agent is not published to the npm registry: the installer downloads a
+# checksummed tarball and runs npm install -g on it, so mise cannot own it as a
+# declarative "npm:" tool. Skip the work when the pinned version is already in.
+if [ "$(prime-agent --version 2>/dev/null || true)" != "$PRIME_AGENT_VERSION" ]; then
+  # Prepare the IPython runtime (uv, Python 3.11, ipykernel) during install
+  # instead of prompting, since chezmoi runs this without a terminal.
+  export PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL=1
+  installer="$(mktemp)"
+  trap 'rm -f "$installer"' EXIT HUP INT TERM
+  curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh -o "$installer"
+  sh "$installer"
+fi
+{{ else -}}
+:
+{{ end -}}

@@ -22,7 +22,10 @@ fi
 trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT HUP INT TERM
 
 export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
-PATH="$HOME/.local/bin:$MISE_DATA_DIR/shims:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
+# The shims must precede ~/.local/bin: leftover node/npm/npx symlinks live there
+# on some machines, and letting them win hands the install scripts a different
+# Node than the one mise declares.
+PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
 export PATH
 
 if ! command -v chezmoi >/dev/null 2>&1; then

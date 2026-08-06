@@ -7,7 +7,7 @@ export PATH="$MISE_DATA_DIR/shims:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/b
 {{ if and (eq .profile "dev") (eq .role "devbox") -}}
 # Install the public catalog only. Pi credentials, sessions, memory, and other
 # machine data remain unmanaged under ~/.pi.
-npx --yes @robzolkos/lazypi@0.6.3 --yes
+npx --yes @robzolkos/lazypi@0.6.4 --yes
 {{ else -}}
 :
 {{ end -}}

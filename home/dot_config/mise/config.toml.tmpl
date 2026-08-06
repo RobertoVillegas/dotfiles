@@ -1,8 +1,8 @@
 [tools]
 # JavaScript runtimes and package managers.
 node = "24.18.1"
-pnpm = "10.16.1"
-bun = "1.3.1"
+pnpm = "10.34.5"
+bun = "1.3.14"
 
 {{- if eq .profile "dev" }}
 # Language toolchains and their CLIs. just and uv used to sit in the Brewfile
@@ -11,7 +11,7 @@ bun = "1.3.1"
 # language ecosystem, brew keeps the native system tools.
 just = "1.58.0"
 uv = "0.12.2"
-ruff = "0.16.0"
+ruff = "0.16.1"
 python = "3.13.14"
 {{- end }}
 

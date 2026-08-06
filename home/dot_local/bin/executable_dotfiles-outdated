@@ -59,6 +59,15 @@ github_latest_tag() {
 	github_json "repos/$1/tags" | jq -r '.[0].name // empty' 2>/dev/null
 }
 
+# A tag carries no date of its own, so the quarantine has to read the commit it
+# points at. Without this the tag-based tools bypass the window entirely.
+github_tag_date() {
+	tag_sha="$(github_json "repos/$1/tags" | jq -r '.[0].commit.sha // empty' 2>/dev/null)"
+	[ -n "$tag_sha" ] || return 0
+	github_json "repos/$1/commits/$tag_sha" |
+		jq -r '.commit.committer.date // empty' 2>/dev/null
+}
+
 # name, current, latest, where the pin lives
 report() {
 	name="$1"
@@ -181,7 +190,8 @@ fullerzz.sesh:fullerzz/herdr-plugin-sesh"
 			"$(printf '%s' "$installed_plugins" | jq -r --arg id "$plugin_id" \
 				'.result.plugins[]? | select(.plugin_id == $id) | .version' 2>/dev/null)" \
 			"$(github_latest_tag "$repo")" \
-			"$scripts/…30-install-herdr-plugins"
+			"$scripts/…30-install-herdr-plugins" \
+			"$(github_tag_date "$repo")"
 	done <<EOF
 $plugins
 EOF

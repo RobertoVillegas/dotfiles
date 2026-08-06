@@ -177,6 +177,22 @@ robada sería ejecución de código en las dos devbox. Tres capas:
    Los seis CLIs se reinstalaron con esto y siguen funcionando, así que no hubo
    que exceptuar ninguno.
 
+4. **Cuarentena de 7 días.** Un paquete envenenado casi siempre se retira en
+   horas, así que el riesgo no es quedarse atrás: es instalar justo dentro de esa
+   ventana. Nada que lleve menos de una semana publicado se instala.
+
+   | Capa | Ajuste | Dónde |
+   | --- | --- | --- |
+   | mise (toolchain) | `minimum_release_age = "7d"` | `dot_config/mise/config.toml.tmpl` |
+   | pnpm (deps de proyectos) | `minimum-release-age=10080` (min) | `dot_npmrc` |
+   | bun (deps de proyectos) | `minimumReleaseAge = 604800` (seg) | `dot_bunfig.toml` |
+
+   npm no tiene equivalente e ignora la llave. `dotfiles-outdated` aplica la
+   misma ventana, así que tampoco propone bumpear a algo recién publicado.
+
+   Para un hotfix legítimo dentro de la ventana: `minimumReleaseAgeExclude` en
+   ese proyecto, o `minimum_release_age_excludes` en mise.
+
 ### Política de versiones
 
 Todo se fija a una versión exacta, no a `latest`. Un `latest` se resuelve el día

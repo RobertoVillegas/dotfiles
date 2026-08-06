@@ -34,8 +34,48 @@ if ! command -v chezmoi >/dev/null 2>&1; then
 fi
 
 printf '\n=== %s chezmoi update ===\n' "$(timestamp)" >>"$log_file"
+
+# Fetch, verify, then apply -- never `chezmoi update`, which merges before
+# anything gets to inspect what it merged. The order is load-bearing: the trust
+# list is read from disk as it was left by the last verified apply, so a pushed
+# commit that adds its own key to allowed_signers is still judged by the old
+# list and rejected.
+trust_file="$HOME/.config/dotfiles/allowed_signers"
+source_dir="$(chezmoi source-path 2>/dev/null || true)"
+repo=""
+if [ -n "$source_dir" ]; then
+	repo="$(git -C "$source_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+fi
+
+if [ -z "$repo" ]; then
+	printf '=== %s abortado: no se encontró el repo de chezmoi ===\n' "$(timestamp)" >>"$log_file"
+	exit 1
+fi
+
+if [ ! -f "$trust_file" ]; then
+	printf '=== %s abortado: falta %s; corre `chezmoi apply` una vez ===\n' \
+		"$(timestamp)" "$trust_file" >>"$log_file"
+	exit 1
+fi
+
+branch="$(git -C "$repo" symbolic-ref --short HEAD 2>/dev/null || echo main)"
+
+if ! git -C "$repo" fetch --quiet origin "$branch" >>"$log_file" 2>&1; then
+	printf '=== %s abortado: falló el fetch ===\n' "$(timestamp)" >>"$log_file"
+	exit 1
+fi
+
+if ! git -C "$repo" -c gpg.ssh.allowedSignersFile="$trust_file" \
+	verify-commit "origin/$branch" >>"$log_file" 2>&1; then
+	printf '=== %s ABORTADO: origin/%s no trae una firma confiable ===\n' \
+		"$(timestamp)" "$branch" >>"$log_file"
+	exit 1
+fi
+
+git -C "$repo" merge --ff-only "origin/$branch" >>"$log_file" 2>&1 || true
+
 status=0
-chezmoi update >>"$log_file" 2>&1 || status=$?
+chezmoi apply >>"$log_file" 2>&1 || status=$?
 printf '=== %s exit %d ===\n' "$(timestamp)" "$status" >>"$log_file"
 
 # Homebrew formulae are the one part of the toolchain deliberately left rolling:

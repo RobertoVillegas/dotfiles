@@ -1,0 +1,8 @@
+# Trust anchor for the unattended dotfiles apply. Public keys only -- nothing
+# here is secret, and verifying a signature never needs the private half.
+#
+# This lists ONLY the authoring workstation, whose signing key lives in 1Password
+# and exists on no devbox. The per-machine keys in ~/.config/git/allowed_signers
+# are deliberately absent: those sit unencrypted on the devboxes, so trusting one
+# would let an attacker who took a devbox sign a commit the other devbox runs.
+hola@robertovillegas.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMGk4XK0rvz2e3H0EP1ylazc8r7gnZ7QZsaynx2WpLE8

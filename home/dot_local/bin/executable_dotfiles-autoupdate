@@ -38,6 +38,23 @@ status=0
 chezmoi update >>"$log_file" 2>&1 || status=$?
 printf '=== %s exit %d ===\n' "$(timestamp)" "$status" >>"$log_file"
 
+# Homebrew formulae are the one part of the toolchain deliberately left rolling:
+# they are stateless CLIs and a Brewfile cannot carry versions anyway. Casks stay
+# manual, since upgrading 1Password or Ghostty unattended restarts a live app.
+if command -v brew >/dev/null 2>&1; then
+  printf '\n=== %s brew update ===\n' "$(timestamp)" >>"$log_file"
+  brew_status=0
+  {
+    brew update
+    brew upgrade --formula
+    brew cleanup --prune=30
+  } >>"$log_file" 2>&1 || brew_status=$?
+  printf '=== %s brew exit %d ===\n' "$(timestamp)" "$brew_status" >>"$log_file"
+  if [ "$status" -eq 0 ]; then
+    status=$brew_status
+  fi
+fi
+
 # Keep the log bounded without pulling in logrotate.
 if [ "$(wc -l <"$log_file")" -gt 2000 ]; then
   tail -n 1000 "$log_file" >"$log_file.new" && mv "$log_file.new" "$log_file"

@@ -1,0 +1,145 @@
+#!/bin/sh
+set -u
+
+# Reports which pinned tools have a newer upstream release. It changes nothing:
+# bumping a pin is an edit in the dotfiles repo, which is the whole point of
+# pinning. `mise outdated` cannot answer this, because an exact pin is by
+# definition the latest version satisfying the request.
+
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:$HOME/.druk/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
+export PATH
+
+behind=0
+unknown=0
+
+strip_v() { printf '%s' "${1#v}"; }
+
+github_latest_release() {
+	curl -fsSL "https://api.github.com/repos/$1/releases/latest" 2>/dev/null |
+		jq -r '.tag_name // empty' 2>/dev/null
+}
+
+github_latest_tag() {
+	curl -fsSL "https://api.github.com/repos/$1/tags" 2>/dev/null |
+		jq -r '.[0].name // empty' 2>/dev/null
+}
+
+# name, current, latest, where the pin lives
+report() {
+	name="$1"
+	current="$(strip_v "${2:-}")"
+	latest="$(strip_v "${3:-}")"
+	where="$4"
+
+	if [ -z "$current" ] || [ -z "$latest" ]; then
+		printf '  %-38s %-11s %-11s %s\n' "$name" "${current:-?}" "${latest:-?}" "no se pudo resolver"
+		unknown=$((unknown + 1))
+		return
+	fi
+
+	if [ "$current" = "$latest" ]; then
+		printf '  %-38s %-11s %s\n' "$name" "$current" "al día"
+	else
+		printf '  %-38s %-11s %-11s %s\n' "$name" "$current" "$latest" "$where"
+		behind=$((behind + 1))
+	fi
+}
+
+printf '\nPins de las dotfiles\n\n'
+printf '  %-38s %-11s %-11s %s\n' "HERRAMIENTA" "INSTALADO" "LATEST" "DÓNDE SE EDITA"
+printf '  %-38s %-11s %-11s %s\n' "-----------" "---------" "------" "--------------"
+
+# --- mise: runtimes y CLIs de npm -------------------------------------------
+mise_config="dot_config/mise/config.toml.tmpl"
+if command -v mise >/dev/null 2>&1; then
+	# Here-doc, not a pipe: a piped `while` runs in a subshell and the counters
+	# report() keeps would be discarded.
+	mise_tools="$(mise ls --installed 2>/dev/null | awk '{print $1, $2}')"
+	while read -r tool installed; do
+		[ -n "$tool" ] || continue
+		report "$tool" "$installed" "$(mise latest "$tool" 2>/dev/null)" "$mise_config"
+	done <<EOF
+$mise_tools
+EOF
+else
+	printf '  mise no está disponible\n'
+fi
+
+# --- instaladores con su propio script --------------------------------------
+scripts=".chezmoiscripts"
+
+if command -v claude >/dev/null 2>&1; then
+	report "claude" \
+		"$(claude --version 2>/dev/null | awk '{print $1}')" \
+		"$(curl -fsSL https://downloads.claude.ai/claude-code-releases/stable 2>/dev/null)" \
+		"$scripts/…20-install-runtime-tools"
+fi
+
+if command -v prime-agent >/dev/null 2>&1; then
+	# prime-agent reporta la versión en stderr.
+	report "prime-agent" \
+		"$(prime-agent --version 2>&1 | tr -d '[:space:]')" \
+		"$(curl -fsSL https://pub-728493de92a943e2a9b2d17b4719f318.r2.dev/stable 2>/dev/null)" \
+		"$scripts/…29-install-prime-agent"
+fi
+
+if command -v ax >/dev/null 2>&1; then
+	report "ax" "$(ax --version 2>/dev/null | head -1)" \
+		"$(github_latest_release yusukebe/ax)" "$scripts/…25-install-ax"
+fi
+
+if command -v druk >/dev/null 2>&1; then
+	report "druk" "$(druk --version 2>/dev/null | head -1)" \
+		"$(github_latest_release letstri/druk)" "$scripts/…28-install-druk"
+fi
+
+# LazyPi corre por npx, así que no deja binario: el pin vive en el script.
+lazypi_source="$(chezmoi source-path 2>/dev/null)/$scripts/run_onchange_after_27-install-lazypi.sh.tmpl"
+if [ -f "$lazypi_source" ]; then
+	report "lazypi" \
+		"$(sed -n 's/.*@robzolkos\/lazypi@\([0-9][0-9.]*\).*/\1/p' "$lazypi_source" | head -1)" \
+		"$(npm view @robzolkos/lazypi version 2>/dev/null)" \
+		"$scripts/…27-install-lazypi"
+fi
+
+# --- plugins de Herdr (pineados por --ref) ----------------------------------
+if command -v herdr >/dev/null 2>&1; then
+	plugins="herdr-file-viewer:smarzban/herdr-file-viewer
+termscope:iurysza/termscope
+worktrunk:devashish2203/herdr-worktrunk
+fullerzz.sesh:fullerzz/herdr-plugin-sesh"
+	installed_plugins="$(herdr plugin list --json 2>/dev/null)"
+	while IFS=: read -r plugin_id repo; do
+		[ -n "$plugin_id" ] || continue
+		report "herdr/$plugin_id" \
+			"$(printf '%s' "$installed_plugins" | jq -r --arg id "$plugin_id" \
+				'.result.plugins[]? | select(.plugin_id == $id) | .version' 2>/dev/null)" \
+			"$(github_latest_tag "$repo")" \
+			"$scripts/…30-install-herdr-plugins"
+	done <<EOF
+$plugins
+EOF
+fi
+
+# --- sin pin posible ---------------------------------------------------------
+if command -v agy >/dev/null 2>&1; then
+	printf '\n  %-38s %-11s %s\n' "agy (Antigravity)" \
+		"$(agy --version 2>/dev/null | head -1)" \
+		"sin pin: su instalador no acepta versión"
+fi
+
+if command -v brew >/dev/null 2>&1; then
+	casks="$(brew outdated --cask --quiet 2>/dev/null | wc -l | tr -d ' ')"
+	printf '  %-38s %-11s %s\n' "casks de Homebrew" "$casks" \
+		"rolling manual: brew upgrade --cask"
+fi
+
+printf '\n'
+if [ "$behind" -eq 0 ]; then
+	printf 'Todos los pins están al día.\n'
+else
+	printf '%d pin(s) con versión más nueva disponible.\n' "$behind"
+fi
+[ "$unknown" -eq 0 ] || printf '%d no se pudieron resolver (¿sin red o límite de la API de GitHub?).\n' "$unknown"
+printf '\n'

@@ -116,6 +116,24 @@ tail -f ~/.local/state/dotfiles/autoupdate.log   # ver la última corrida
 dotfiles-autoupdate                              # forzar una ahora
 ```
 
+Esa misma corrida hace `brew update && brew upgrade --formula` y un `brew
+cleanup`. Los casks quedan fuera a propósito: subir 1Password, Ghostty o Raycast
+sin supervisión reinicia una app que puedes estar usando. Para esos:
+
+```sh
+brew upgrade --cask
+```
+
+Para saber qué pins tienen versión más nueva disponible:
+
+```sh
+dotfiles-outdated
+```
+
+Compara lo instalado contra el upstream de cada herramienta y dice en qué
+archivo se edita cada pin. `mise outdated` no sirve para esto: con una versión
+exacta, la pedida siempre es la más nueva que satisface la petición.
+
 Las versiones y CLIs administradas por mise se declaran en
 `home/dot_config/mise/config.toml.tmpl`. Para agregar una CLI de npm de forma
 reproducible, añade una entrada como `"npm:dev3000" = "0.0.178"`; una instalación

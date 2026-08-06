@@ -1,0 +1,10 @@
+# Cooldown for project dependencies, in minutes (7 days).
+#
+# A compromised package is usually pulled within hours of being published, so
+# refusing anything younger than a week means the window closes before these
+# machines would ever reach it. pnpm reads this key; npm has no equivalent and
+# ignores it.
+#
+# For a genuine hotfix inside the window, use pnpm's minimumReleaseAgeExclude in
+# that project rather than lowering this.
+minimum-release-age=10080

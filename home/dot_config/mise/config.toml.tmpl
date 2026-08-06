@@ -42,3 +42,8 @@ npm.shell_out = true
 # the resolved download URLs, which keeps installs off the GitHub API.
 lockfile = true
 lockfile_platforms = ["macos-arm64", "linux-x64"]
+# Refuse versions published less than a week ago. A poisoned release is usually
+# yanked within hours, so the danger is bumping a pin during that window. The
+# docs claim a 24h default but `mise settings get` reports it unset, so it is
+# spelled out here rather than assumed.
+minimum_release_age = "7d"

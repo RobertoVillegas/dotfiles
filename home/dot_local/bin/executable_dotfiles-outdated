@@ -12,8 +12,20 @@ export PATH
 
 behind=0
 unknown=0
+quarantined=0
+
+# Same 7-day window the installers enforce. A version newer than this is not
+# proposed: a poisoned release is usually yanked within hours, and the only way
+# these machines would reach one is by bumping a pin during that window.
+cooldown_cutoff="$(date -u -d '7 days ago' +%Y-%m-%d 2>/dev/null ||
+	date -u -v-7d +%Y-%m-%d 2>/dev/null || echo '')"
 
 strip_v() { printf '%s' "${1#v}"; }
+
+# ISO-8601 dates compare correctly as plain strings once truncated to the day.
+too_new() {
+	[ -n "${1:-}" ] && [ -n "$cooldown_cutoff" ] && [ "${1%%T*}" \> "$cooldown_cutoff" ]
+}
 
 # Unauthenticated api.github.com allows 60 requests an hour, which this report
 # can exhaust on its own. Prefer gh, which is authenticated and gets 5000.
@@ -33,6 +45,14 @@ github_json() {
 
 github_latest_release() {
 	github_json "repos/$1/releases/latest" | jq -r '.tag_name // empty' 2>/dev/null
+}
+
+github_release_date() {
+	github_json "repos/$1/releases/latest" | jq -r '.published_at // empty' 2>/dev/null
+}
+
+npm_version_date() {
+	npm view "$1" "time.$2" 2>/dev/null | tr -d '\r'
 }
 
 github_latest_tag() {
@@ -61,6 +81,12 @@ report() {
 	# release. That is not something to bump.
 	if [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -1)" = "$current" ]; then
 		printf '  %-38s %-11s %-11s %s\n' "$name" "$current" "$latest" "adelantado al pin"
+		return
+	fi
+
+	if too_new "${5:-}"; then
+		printf '  %-38s %-11s %-11s %s\n' "$name" "$current" "$latest" "en cuarentena, <7d"
+		quarantined=$((quarantined + 1))
 		return
 	fi
 
@@ -121,21 +147,25 @@ fi
 
 if command -v ax >/dev/null 2>&1; then
 	report "ax" "$(ax --version 2>/dev/null | head -1)" \
-		"$(github_latest_release yusukebe/ax)" "$scripts/…25-install-ax"
+		"$(github_latest_release yusukebe/ax)" "$scripts/…25-install-ax" \
+		"$(github_release_date yusukebe/ax)"
 fi
 
 if command -v druk >/dev/null 2>&1; then
 	report "druk" "$(druk --version 2>/dev/null | head -1)" \
-		"$(github_latest_release letstri/druk)" "$scripts/…28-install-druk"
+		"$(github_latest_release letstri/druk)" "$scripts/…28-install-druk" \
+		"$(github_release_date letstri/druk)"
 fi
 
 # LazyPi corre por npx, así que no deja binario: el pin vive en el script.
 lazypi_source="$(chezmoi source-path 2>/dev/null)/$scripts/run_onchange_after_27-install-lazypi.sh.tmpl"
 if [ -f "$lazypi_source" ]; then
+	lazypi_latest="$(npm view @robzolkos/lazypi version 2>/dev/null)"
 	report "lazypi" \
 		"$(sed -n 's/.*@robzolkos\/lazypi@\([0-9][0-9.]*\).*/\1/p' "$lazypi_source" | head -1)" \
-		"$(npm view @robzolkos/lazypi version 2>/dev/null)" \
-		"$scripts/…27-install-lazypi"
+		"$lazypi_latest" \
+		"$scripts/…27-install-lazypi" \
+		"$(npm_version_date @robzolkos/lazypi "$lazypi_latest")"
 fi
 
 # --- plugins de Herdr (pineados por --ref) ----------------------------------
@@ -176,5 +206,6 @@ if [ "$behind" -eq 0 ]; then
 else
 	printf '%d pin(s) con versión más nueva disponible.\n' "$behind"
 fi
+[ "$quarantined" -eq 0 ] || printf '%d en cuarentena por tener menos de 7 días publicados.\n' "$quarantined"
 [ "$unknown" -eq 0 ] || printf '%d no se pudieron resolver (¿sin red o límite de la API de GitHub?).\n' "$unknown"
 printf '\n'

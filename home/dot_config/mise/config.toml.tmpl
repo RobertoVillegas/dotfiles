@@ -5,6 +5,24 @@ pnpm = "10.16.1"
 bun = "1.3.1"
 
 {{- if eq .profile "dev" }}
+# Language toolchains and their CLIs. just and uv used to sit in the Brewfile
+# while mise installed them too, so each machine ran whichever copy its PATH hit
+# first, at different versions. One owner each: mise takes anything tied to a
+# language ecosystem, brew keeps the native system tools.
+just = "1.58.0"
+uv = "0.12.2"
+ruff = "0.16.0"
+python = "3.13.14"
+{{- end }}
+
+{{- if and (eq .profile "dev") (ne .gpu "none") }}
+# Only where there is a GPU: the Rust toolchain is over a gigabyte and flatc is
+# specific to the work that happens on that machine.
+rust = "1.97.1"
+flatc = "25.12.19"
+{{- end }}
+
+{{- if eq .profile "dev" }}
 # Coding agents and their companion tools. Pinned rather than "latest": mise
 # resolves "latest" when a machine first installs the tool, so two devboxes set
 # up on different days silently end up on different versions. Bump these by
@@ -20,3 +38,7 @@ bun = "1.3.1"
 [settings]
 idiomatic_version_file_enable_tools = ["node"]
 npm.shell_out = true
+# A pin says which version; the lockfile says which exact bytes. It also stores
+# the resolved download URLs, which keeps installs off the GitHub API.
+lockfile = true
+lockfile_platforms = ["macos-arm64", "linux-x64"]

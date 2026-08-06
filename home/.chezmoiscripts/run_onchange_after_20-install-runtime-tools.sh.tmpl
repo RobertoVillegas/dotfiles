@@ -13,6 +13,12 @@ command -v mise >/dev/null 2>&1 || {
 }
 
 cd "$HOME"
+# An npm package can run arbitrary commands at install time via preinstall and
+# postinstall, as the invoking user, before the tool is ever used -- the classic
+# way a compromised package steals keys and tokens. Blocked by default; any CLI
+# that genuinely needs its postinstall to fetch a binary is listed below.
+export npm_config_ignore_scripts=true
+
 # npm.shell_out requires npm to exist before mise installs npm-backed tools.
 mise install node pnpm bun
 mise install

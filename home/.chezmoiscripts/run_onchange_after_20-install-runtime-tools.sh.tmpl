@@ -37,8 +37,13 @@ if command -v claude >/dev/null 2>&1; then
   # `claude --version` prints "<version> (Claude Code)".
   current_claude="$(claude --version 2>/dev/null | awk '{print $1}')"
 fi
-if [ "$current_claude" != "$claude_version" ] &&
-  [ "$(printf '%s\n%s\n' "$claude_version" "$current_claude" | sort -V | head -1)" = "$current_claude" ]; then
+if [ -z "$current_claude" ]; then
   curl -fsSL https://claude.ai/install.sh | bash -s "$claude_version"
+elif [ "$current_claude" != "$claude_version" ] &&
+  [ "$(printf '%s\n%s\n' "$claude_version" "$current_claude" | sort -V | head -1)" = "$current_claude" ]; then
+  # Not the shell installer: once the build is already on disk it reports success
+  # while leaving ~/.local/bin/claude pointed at the old version. `claude install
+  # --force` is what actually repoints the launcher.
+  claude install "$claude_version" --force
 fi
 {{- end }}

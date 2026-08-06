@@ -40,10 +40,18 @@ report() {
 
 	if [ "$current" = "$latest" ]; then
 		printf '  %-38s %-11s %s\n' "$name" "$current" "al día"
-	else
-		printf '  %-38s %-11s %-11s %s\n' "$name" "$current" "$latest" "$where"
-		behind=$((behind + 1))
+		return
 	fi
+
+	# Claude Code auto-updates itself, so it can sit ahead of the pinned stable
+	# release. That is not something to bump.
+	if [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -1)" = "$current" ]; then
+		printf '  %-38s %-11s %-11s %s\n' "$name" "$current" "$latest" "adelantado al pin"
+		return
+	fi
+
+	printf '  %-38s %-11s %-11s %s\n' "$name" "$current" "$latest" "$where"
+	behind=$((behind + 1))
 }
 
 printf '\nPins de las dotfiles\n\n'

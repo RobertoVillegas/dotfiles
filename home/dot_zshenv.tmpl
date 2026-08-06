@@ -8,6 +8,15 @@ export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/home/linuxbrew/.linuxbrew/bi
 [[ -d /usr/lib/wsl/lib ]] && export PATH="/usr/lib/wsl/lib:$PATH"
 {{ end -}}
 
+# Runtime managers that predate mise leave env vars and PATH entries behind that
+# still shadow it: proto keeps shims for node, npm, pnpm and bun, and bun and
+# pnpm each ship their own installer directory. mise is the only owner, so strip
+# the rest before anything else runs.
+unset PROTO_HOME NPM_CONFIG_PREFIX npm_config_prefix PNPM_HOME BUN_INSTALL
+path=(${path:#${HOME}/.proto/*})
+path=(${path:#${HOME}/.bun/*})
+path=(${path:#${HOME}/Library/pnpm})
+
 # Keep OrbStack's clients available without letting its bundled runtimes
 # override the versions selected by mise.
 [[ -d "$HOME/.orbstack/bin" ]] && export PATH="$PATH:$HOME/.orbstack/bin"

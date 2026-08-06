@@ -5,6 +5,12 @@
 {{- $gpu := env "DOTFILES_GPU" | default "none" -}}
 {{- $container := env "DOTFILES_CONTAINER" | default "auto" -}}
 {{- $remoteOwner := env "DOTFILES_REMOTE_OWNER" | default "auto" -}}
+{{- $sourceDir := env "DOTFILES_SOURCE_DIR" -}}
+{{- /* The authoring machine points chezmoi at its working clone so edits land
+       in the repo directly. Devboxes leave this unset and take the default. */ -}}
+{{- if $sourceDir }}
+sourceDir = {{ $sourceDir | quote }}
+{{ end }}
 [data]
 profile = {{ $profile | quote }}
 role = {{ $role | quote }}

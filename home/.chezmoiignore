@@ -6,6 +6,14 @@ Library/Application Support
 Library/LaunchAgents
 {{ end }}
 
+{{/* pnpm keeps its global YAML config under Library on macOS and .config on
+     Linux, so each host takes exactly one of the two. */}}
+{{ if ne .chezmoi.os "darwin" }}
+Library/Preferences
+{{ else }}
+.config/pnpm
+{{ end }}
+
 {{ if or (eq .chezmoi.os "darwin") (ne .profile "dev") (ne .role "devbox") }}
 .config/systemd
 {{ end }}

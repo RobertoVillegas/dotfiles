@@ -1,0 +1,11 @@
+# Cooldown for project dependencies, in minutes (7 days).
+#
+# A compromised package is usually pulled within hours of publication, so
+# refusing anything younger than a week closes the window before this machine
+# would reach it. pnpm 11 defaults to 1440 (24h); this widens it.
+#
+# Not ~/.npmrc: pnpm keeps registry and auth in INI files and every other
+# setting in YAML, so the key is silently ignored there -- and npm warns about
+# it on every command. For a genuine hotfix inside the window, use
+# minimumReleaseAgeExclude in that project's pnpm-workspace.yaml.
+minimumReleaseAge: 10080

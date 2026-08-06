@@ -47,18 +47,31 @@ report() {
 }
 
 printf '\nPins de las dotfiles\n\n'
-printf '  %-38s %-11s %-11s %s\n' "HERRAMIENTA" "INSTALADO" "LATEST" "DÓNDE SE EDITA"
-printf '  %-38s %-11s %-11s %s\n' "-----------" "---------" "------" "--------------"
+printf '  %-38s %-11s %-11s %s\n' "HERRAMIENTA" "ACTUAL" "LATEST" "DÓNDE SE EDITA"
+printf '  %-38s %-11s %-11s %s\n' "-----------" "------" "------" "--------------"
 
 # --- mise: runtimes y CLIs de npm -------------------------------------------
 mise_config="dot_config/mise/config.toml.tmpl"
-if command -v mise >/dev/null 2>&1; then
+mise_config_file="${MISE_CONFIG_FILE:-$HOME/.config/mise/config.toml}"
+if command -v mise >/dev/null 2>&1 && [ -f "$mise_config_file" ]; then
+	# Read the declared [tools], not `mise ls --installed`: a machine can carry
+	# tools installed by hand that the dotfiles never declared, and listing those
+	# would point at a config file that says nothing about them.
+	mise_tools="$(awk '
+		/^[[:space:]]*#/ { next }
+		/^\[tools\]/     { in_tools = 1; next }
+		/^\[/            { in_tools = 0 }
+		in_tools && /=/ {
+			key = $0; sub(/[[:space:]]*=.*/, "", key); gsub(/["[:space:]]/, "", key)
+			val = $0; sub(/^[^=]*=[[:space:]]*/, "", val); gsub(/["[:space:]]/, "", val)
+			if (key != "" && val != "") print key, val
+		}
+	' "$mise_config_file")"
 	# Here-doc, not a pipe: a piped `while` runs in a subshell and the counters
 	# report() keeps would be discarded.
-	mise_tools="$(mise ls --installed 2>/dev/null | awk '{print $1, $2}')"
-	while read -r tool installed; do
+	while read -r tool pinned; do
 		[ -n "$tool" ] || continue
-		report "$tool" "$installed" "$(mise latest "$tool" 2>/dev/null)" "$mise_config"
+		report "$tool" "$pinned" "$(mise latest "$tool" 2>/dev/null)" "$mise_config"
 	done <<EOF
 $mise_tools
 EOF

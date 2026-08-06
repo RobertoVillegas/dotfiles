@@ -2,7 +2,7 @@
 set -eu
 
 {{ if eq .profile "dev" -}}
-export AX_VERSION="v0.1.19"
+export AX_VERSION="v0.1.25"
 installer="$(mktemp)"
 trap 'rm -f "$installer"' EXIT HUP INT TERM
 curl -fsSL https://ax.yusuke.run/install -o "$installer"

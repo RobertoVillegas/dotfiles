@@ -17,10 +17,11 @@ fi
 # manifest versions also let termscope sit on an unpinned commit while looking
 # compliant. Re-resolve with `gh api repos/<repo>/tags` when bumping.
 plugins=(
-  "herdr-file-viewer	smarzban/herdr-file-viewer	v1.14.0	96fcc0a2bdd2727ec88c38f8c8806f97b7ca0ea0"
+  "herdr-file-viewer	smarzban/herdr-file-viewer	v1.15.0	a2368d701659813938f79e2f1e5aa4e9f4fb2b77"
   "termscope	iurysza/termscope	v0.2.0	236ab631f9d4cc842e2da0a26c7310f052c11999"
   "worktrunk	devashish2203/herdr-worktrunk	v0.5.0	a3107ca566bafcd463bc138007a0c01051970784"
   "fullerzz.sesh	fullerzz/herdr-plugin-sesh	v0.6.0	f96324af662717b7109abb37439aad5077775bc1"
+  "mirror	nikok6/herdr-mirror	v0.1.16	a569217ae59166470aa6a1fc0bbca2dea196af64"
 )
 
 installed="$(herdr plugin list --json)"

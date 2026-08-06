@@ -2,7 +2,7 @@
 set -euo pipefail
 
 {{ if eq .profile "dev" -}}
-export VERSION="1.9.0"
+export VERSION="1.16.0"
 # The installer skips the download when the pinned version is already on PATH,
 # and chezmoi owns ~/.zshrc, so it must not append its own PATH line there.
 export PATH="$HOME/.druk/bin:$PATH"

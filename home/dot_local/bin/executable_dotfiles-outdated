@@ -182,7 +182,8 @@ if command -v herdr >/dev/null 2>&1; then
 	plugins="herdr-file-viewer:smarzban/herdr-file-viewer
 termscope:iurysza/termscope
 worktrunk:devashish2203/herdr-worktrunk
-fullerzz.sesh:fullerzz/herdr-plugin-sesh"
+fullerzz.sesh:fullerzz/herdr-plugin-sesh
+mirror:nikok6/herdr-mirror"
 	installed_plugins="$(herdr plugin list --json 2>/dev/null)"
 	while IFS=: read -r plugin_id repo; do
 		[ -n "$plugin_id" ] || continue

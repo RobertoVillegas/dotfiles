@@ -1,0 +1,9 @@
+{{ if and (eq .profile "dev") (eq .role "devbox") }}
+{{/* mise owns node, npm and npx. Hermes' installer has dropped symlinks to
+     ~/.hermes/node/bin here before, which shadow the mise shims for any script
+     that puts ~/.local/bin first. Hermes itself resolves its Node through its
+     own PATH, so it does not need them. */}}
+.local/bin/node
+.local/bin/npm
+.local/bin/npx
+{{ end }}

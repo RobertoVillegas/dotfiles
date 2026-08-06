@@ -177,18 +177,21 @@ robada sería ejecución de código en las dos devbox. Tres capas:
    Los seis CLIs se reinstalaron con esto y siguen funcionando, así que no hubo
    que exceptuar ninguno.
 
-4. **Cuarentena de 7 días.** Un paquete envenenado casi siempre se retira en
+4. **Cuarentena de 24 horas.** Un paquete envenenado casi siempre se retira en
    horas, así que el riesgo no es quedarse atrás: es instalar justo dentro de esa
-   ventana. Nada que lleve menos de una semana publicado se instala.
+   ventana. Un día la cierra casi por completo sin costar frescura.
 
    | Capa | Ajuste | Dónde |
    | --- | --- | --- |
-   | mise (toolchain) | `minimum_release_age = "7d"` | `dot_config/mise/config.toml.tmpl` |
-   | pnpm (deps de proyectos) | `minimum-release-age=10080` (min) | `dot_npmrc` |
-   | bun (deps de proyectos) | `minimumReleaseAge = 604800` (seg) | `dot_bunfig.toml` |
+   | mise (toolchain) | `minimum_release_age = "24h"` | `dot_config/mise/config.toml.tmpl` |
+   | pnpm (deps de proyectos) | `minimumReleaseAge: 1440` (min) | `dot_config/pnpm/config.yaml` (Linux) |
+   | | | `private_Library/Preferences/pnpm/config.yaml` (macOS) |
+   | bun (deps de proyectos) | `minimumReleaseAge = 86400` (seg) | `dot_bunfig.toml` |
 
-   npm no tiene equivalente e ignora la llave. `dotfiles-outdated` aplica la
-   misma ventana, así que tampoco propone bumpear a algo recién publicado.
+   pnpm guarda registry y auth en INI y todo lo demás en YAML, así que la llave
+   en `~/.npmrc` se ignora en silencio y npm además advierte por ella. npm no
+   tiene equivalente. `dotfiles-outdated` aplica la misma ventana, así que
+   tampoco propone bumpear a algo recién publicado.
 
    Para un hotfix legítimo dentro de la ventana: `minimumReleaseAgeExclude` en
    ese proyecto, o `minimum_release_age_excludes` en mise.

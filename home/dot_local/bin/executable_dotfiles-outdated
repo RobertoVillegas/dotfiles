@@ -14,11 +14,11 @@ behind=0
 unknown=0
 quarantined=0
 
-# Same 7-day window the installers enforce. A version newer than this is not
+# Same 24-hour window the installers enforce. A version newer than this is not
 # proposed: a poisoned release is usually yanked within hours, and the only way
 # these machines would reach one is by bumping a pin during that window.
-cooldown_cutoff="$(date -u -d '7 days ago' +%Y-%m-%d 2>/dev/null ||
-	date -u -v-7d +%Y-%m-%d 2>/dev/null || echo '')"
+cooldown_cutoff="$(date -u -d '1 day ago' +%Y-%m-%d 2>/dev/null ||
+	date -u -v-1d +%Y-%m-%d 2>/dev/null || echo '')"
 
 strip_v() { printf '%s' "${1#v}"; }
 
@@ -94,7 +94,7 @@ report() {
 	fi
 
 	if too_new "${5:-}"; then
-		printf '  %-38s %-11s %-11s %s\n' "$name" "$current" "$latest" "en cuarentena, <7d"
+		printf '  %-38s %-11s %-11s %s\n' "$name" "$current" "$latest" "en cuarentena, <24h"
 		quarantined=$((quarantined + 1))
 		return
 	fi
@@ -203,7 +203,7 @@ mirror:nikok6/herdr-mirror"
 			printf '  %-38s %-11s %s\n' "$name" "$want_tag" "al día"
 		elif too_new "$(github_tag_date "$repo")"; then
 			printf '  %-38s %-11s %-11s %s\n' "$name" "$(printf '%.9s' "$have")" \
-				"$want_tag" "en cuarentena, <7d"
+				"$want_tag" "en cuarentena, <24h"
 			quarantined=$((quarantined + 1))
 		else
 			printf '  %-38s %-11s %-11s %s\n' "$name" "$(printf '%.9s' "$have")" \
@@ -234,6 +234,6 @@ if [ "$behind" -eq 0 ]; then
 else
 	printf '%d pin(s) con versión más nueva disponible.\n' "$behind"
 fi
-[ "$quarantined" -eq 0 ] || printf '%d en cuarentena por tener menos de 7 días publicados.\n' "$quarantined"
+[ "$quarantined" -eq 0 ] || printf '%d en cuarentena por tener menos de 24 horas publicados.\n' "$quarantined"
 [ "$unknown" -eq 0 ] || printf '%d no se pudieron resolver (¿sin red o límite de la API de GitHub?).\n' "$unknown"
 printf '\n'

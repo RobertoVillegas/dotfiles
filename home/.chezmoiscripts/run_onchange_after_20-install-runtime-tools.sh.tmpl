@@ -21,7 +21,15 @@ export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
 export PATH="$MISE_DATA_DIR/shims:$PATH"
 
 {{- if eq .profile "dev" }}
-if ! command -v claude >/dev/null 2>&1; then
-  curl -fsSL https://claude.ai/install.sh | bash
+# Tracking the stable channel would leave each machine on whatever shipped the
+# day it was set up, so the installer gets an explicit version instead.
+claude_version="2.1.220"
+current_claude=""
+if command -v claude >/dev/null 2>&1; then
+  # `claude --version` prints "<version> (Claude Code)".
+  current_claude="$(claude --version 2>/dev/null | awk '{print $1}')"
+fi
+if [ "$current_claude" != "$claude_version" ]; then
+  curl -fsSL https://claude.ai/install.sh | bash -s "$claude_version"
 fi
 {{- end }}

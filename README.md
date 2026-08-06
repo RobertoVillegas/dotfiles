@@ -118,9 +118,28 @@ dotfiles-autoupdate                              # forzar una ahora
 
 Las versiones y CLIs administradas por mise se declaran en
 `home/dot_config/mise/config.toml.tmpl`. Para agregar una CLI de npm de forma
-reproducible, añade una entrada como `"npm:dev3000" = "latest"`; una instalación
+reproducible, añade una entrada como `"npm:dev3000" = "0.0.178"`; una instalación
 manual con `npm install -g` pertenece a la versión activa de Node y no pasa a
 formar parte del inventario declarativo.
+
+### Política de versiones
+
+Todo se fija a una versión exacta, no a `latest`. Un `latest` se resuelve el día
+que cada máquina instala la herramienta, así que dos devbox configuradas en
+fechas distintas terminan en versiones distintas sin que nada lo reporte.
+Actualizar es editar el número y hacer push; el auto-update diario lo propaga.
+
+Las versiones viven junto a cada instalador:
+
+| Herramienta | Dónde |
+| --- | --- |
+| node, pnpm, bun y CLIs de npm | `dot_config/mise/config.toml.tmpl` |
+| Claude Code | `run_onchange_after_20-install-runtime-tools.sh.tmpl` |
+| Ax, druk, LazyPi, Prime Agent | su propio `run_onchange_after_*` |
+| Plugins de Herdr | `run_onchange_after_30-install-herdr-plugins.sh.tmpl` (`--ref`) |
+
+Antigravity es la excepción: su instalador sólo acepta `--dir` y siempre baja la
+release actual, así que queda en la versión del día en que se instaló la máquina.
 
 Para revisar o reinstalar sólo los paquetes de Homebrew:
 

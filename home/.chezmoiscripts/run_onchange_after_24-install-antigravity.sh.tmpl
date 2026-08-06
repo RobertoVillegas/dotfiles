@@ -4,6 +4,9 @@ set -euo pipefail
 {{- if eq .profile "dev" }}
 export PATH="$HOME/.local/bin:$PATH"
 
+# Unpinnable: the upstream installer only accepts --dir and always fetches the
+# current release. The command -v guard is the only brake, so agy stays on
+# whatever shipped the day a machine was set up. Both devboxes are on 1.1.9.
 if ! command -v agy >/dev/null 2>&1; then
   target_dir="$HOME/.local/bin"
   setup_home="$(mktemp -d)"

@@ -2,16 +2,9 @@
 set -euo pipefail
 
 {{ if eq .profile "dev" -}}
-{{/* Resolve the stable channel at apply time: embedding the version is what
-     makes this script's content change when upstream publishes a release, so
-     chezmoi re-runs it. An unreachable channel resolves empty and no-ops. */ -}}
-{{- $channel := output "sh" "-c" "curl -fsSL https://pub-728493de92a943e2a9b2d17b4719f318.r2.dev/stable 2>/dev/null || true" | trim -}}
-# Prime Agent stable channel: {{ $channel | default "unresolved" }}
+export PRIME_AGENT_VERSION="0.7.0"
 export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
 export PATH="$MISE_DATA_DIR/shims:$PATH"
-
-target="{{ $channel }}"
-target="${target#v}"
 
 # prime-agent --version reports on stderr, so this has to merge the streams.
 current=""
@@ -21,9 +14,8 @@ fi
 
 # Prime Agent is not published to the npm registry: the installer downloads a
 # checksummed tarball and runs npm install -g on it, so mise cannot own it as a
-# declarative "npm:" tool.
-if [ -n "$target" ] && [ "$current" != "$target" ]; then
-  export PRIME_AGENT_VERSION="$target"
+# declarative "npm:" tool. Bumping the pin above is what re-runs this script.
+if [ "$current" != "$PRIME_AGENT_VERSION" ]; then
   # Prepare the IPython runtime (uv, Python 3.11, ipykernel) during install
   # instead of prompting, since chezmoi runs this without a terminal.
   export PRIME_AGENT_BOOTSTRAP_KERNEL_ON_INSTALL=1

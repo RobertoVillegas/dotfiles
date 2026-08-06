@@ -10,27 +10,26 @@ if ! command -v herdr >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! herdr plugin list --json |
-  jq -e '.result.plugins[]? | select(.plugin_id == "herdr-file-viewer")' >/dev/null; then
-  echo "Installing herdr-file-viewer..."
-  herdr plugin install smarzban/herdr-file-viewer --yes
-fi
+# plugin_id, owner/repo, version. Without --ref herdr takes the default branch,
+# which froze each plugin at whatever it was on install day with no record of
+# which commit that was. The manifest reports the tag without its leading "v".
+plugins=(
+  "herdr-file-viewer	smarzban/herdr-file-viewer	1.14.0"
+  "termscope	iurysza/termscope	0.2.0"
+  "worktrunk	devashish2203/herdr-worktrunk	0.1.0"
+  "fullerzz.sesh	fullerzz/herdr-plugin-sesh	0.6.0"
+)
 
-if ! herdr plugin list --json |
-  jq -e '.result.plugins[]? | select(.plugin_id == "termscope")' >/dev/null; then
-  echo "Installing termscope..."
-  herdr plugin install iurysza/termscope --yes
-fi
+installed="$(herdr plugin list --json)"
 
-if ! herdr plugin list --json |
-  jq -e '.result.plugins[]? | select(.plugin_id == "worktrunk")' >/dev/null; then
-  echo "Installing herdr-worktrunk..."
-  herdr plugin install devashish2203/herdr-worktrunk --yes
-fi
-
-if ! herdr plugin list --json |
-  jq -e '.result.plugins[]? | select(.plugin_id == "fullerzz.sesh")' >/dev/null; then
-  echo "Installing herdr-plugin-sesh..."
-  herdr plugin install fullerzz/herdr-plugin-sesh --yes
-fi
+for entry in "${plugins[@]}"; do
+  IFS=$'\t' read -r plugin_id repo version <<<"$entry"
+  if jq -e --arg id "$plugin_id" --arg version "$version" \
+    '.result.plugins[]? | select(.plugin_id == $id and .version == $version)' \
+    >/dev/null <<<"$installed"; then
+    continue
+  fi
+  echo "Installing $plugin_id v$version..."
+  herdr plugin install "$repo" --ref "v$version" --yes
+done
 {{- end }}

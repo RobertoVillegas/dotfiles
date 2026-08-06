@@ -13,10 +13,16 @@ export PATH="$MISE_DATA_DIR/shims:$PATH"
 target="{{ $channel }}"
 target="${target#v}"
 
+# prime-agent --version reports on stderr, so this has to merge the streams.
+current=""
+if command -v prime-agent >/dev/null 2>&1; then
+  current="$(prime-agent --version 2>&1 | tr -d '[:space:]')"
+fi
+
 # Prime Agent is not published to the npm registry: the installer downloads a
 # checksummed tarball and runs npm install -g on it, so mise cannot own it as a
 # declarative "npm:" tool.
-if [ -n "$target" ] && [ "$(prime-agent --version 2>/dev/null || true)" != "$target" ]; then
+if [ -n "$target" ] && [ "$current" != "$target" ]; then
   export PRIME_AGENT_VERSION="$target"
   # Prepare the IPython runtime (uv, Python 3.11, ipykernel) during install
   # instead of prompting, since chezmoi runs this without a terminal.

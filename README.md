@@ -140,6 +140,43 @@ reproducible, añade una entrada como `"npm:dev3000" = "0.0.178"`; una instalaci
 manual con `npm install -g` pertenece a la versión activa de Node y no pasa a
 formar parte del inventario declarativo.
 
+### Quién es dueño de qué
+
+Cada herramienta tiene un solo dueño. Cuando hay dos, el PATH decide en silencio
+y cada máquina termina con una versión distinta.
+
+- **mise**: runtimes y cualquier CLI atado a un ecosistema de lenguaje — node,
+  pnpm, bun, python, rust, uv, ruff, just y los paquetes `npm:`.
+- **brew**: herramientas nativas del sistema y los casks.
+
+Nada puede estar en ambos. Los shims de mise van primero en el PATH, así que una
+copia en brew es peso muerto que además deriva.
+
+### Seguridad de la cadena de suministro
+
+El auto-update ejecuta lo que llegue a `origin/main`, así que una credencial
+robada sería ejecución de código en las dos devbox. Tres capas:
+
+1. **Firma verificada antes de aplicar.** `dotfiles-autoupdate` hace fetch,
+   verifica que el commit venga firmado por una llave en
+   `~/.config/dotfiles/allowed_signers`, y sólo entonces hace merge y aplica. Si
+   la firma no verifica, aborta sin tocar nada.
+
+   Esa lista trae **sólo la llave de la workstation**, que vive en 1Password. Las
+   llaves de cada devbox están a propósito fuera: viven sin cifrar en esas
+   máquinas, así que confiar en una dejaría que quien tome un devbox firme un
+   commit que la otra ejecuta. Verificar usa nada más la llave pública.
+
+2. **`mise.lock` con checksums.** El pin dice qué versión; el lockfile dice qué
+   bytes exactos. Cubre las herramientas que mise descarga él mismo. Los CLIs de
+   `npm:` y rust quedan fuera porque esos backends delegan la descarga a npm y
+   rustup, que no le entregan a mise nada que verificar.
+
+3. **`npm_config_ignore_scripts`.** Bloquea los `preinstall`/`postinstall`, que
+   corren como tú al instalar y son la vía clásica para robar llaves y tokens.
+   Los seis CLIs se reinstalaron con esto y siguen funcionando, así que no hubo
+   que exceptuar ninguno.
+
 ### Política de versiones
 
 Todo se fija a una versión exacta, no a `latest`. Un `latest` se resuelve el día

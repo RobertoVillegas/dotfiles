@@ -1,9 +1,16 @@
-{{ if and (eq .profile "dev") (eq .role "devbox") }}
-{{/* mise owns node, npm and npx. Hermes' installer has dropped symlinks to
-     ~/.hermes/node/bin here before, which shadow the mise shims for any script
-     that puts ~/.local/bin first. Hermes itself resolves its Node through its
-     own PATH, so it does not need them. */}}
+{{ if eq .profile "dev" }}
+{{/* mise owns these; a second copy earlier in PATH decides silently and each
+     machine drifts. Every one of these was found live: hermes symlinked node,
+     npm and npx to its own Node 22; a standalone uv 0.8.17 predated mise; and
+     python/python3 pointed at a uv-managed 3.14.0rc2 release candidate.
+     Version-suffixed pythons (python3.11 and friends) are left alone -- those
+     are uv's per-version installs and do not collide with mise's python. */}}
 .local/bin/node
 .local/bin/npm
 .local/bin/npx
+.local/bin/uv
+.local/bin/uvx
+.local/bin/bunx
+.local/bin/python
+.local/bin/python3
 {{ end }}

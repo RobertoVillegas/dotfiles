@@ -10,26 +10,29 @@ if ! command -v herdr >/dev/null 2>&1; then
   exit 1
 fi
 
-# plugin_id, owner/repo, version. Without --ref herdr takes the default branch,
-# which froze each plugin at whatever it was on install day with no record of
-# which commit that was. The manifest reports the tag without its leading "v".
+# plugin_id, owner/repo, tag, commit. The tag is only a label for humans: both
+# the ref and the guard use the commit, because a tag can be moved and a manifest
+# version cannot be trusted -- worktrunk still declares 0.1.0 at tag v0.5.0, so a
+# version check would reinstall it on every run and never converge. Comparing
+# manifest versions also let termscope sit on an unpinned commit while looking
+# compliant. Re-resolve with `gh api repos/<repo>/tags` when bumping.
 plugins=(
-  "herdr-file-viewer	smarzban/herdr-file-viewer	1.14.0"
-  "termscope	iurysza/termscope	0.2.0"
-  "worktrunk	devashish2203/herdr-worktrunk	0.5.0"
-  "fullerzz.sesh	fullerzz/herdr-plugin-sesh	0.6.0"
+  "herdr-file-viewer	smarzban/herdr-file-viewer	v1.14.0	96fcc0a2bdd2727ec88c38f8c8806f97b7ca0ea0"
+  "termscope	iurysza/termscope	v0.2.0	236ab631f9d4cc842e2da0a26c7310f052c11999"
+  "worktrunk	devashish2203/herdr-worktrunk	v0.5.0	a3107ca566bafcd463bc138007a0c01051970784"
+  "fullerzz.sesh	fullerzz/herdr-plugin-sesh	v0.6.0	f96324af662717b7109abb37439aad5077775bc1"
 )
 
 installed="$(herdr plugin list --json)"
 
 for entry in "${plugins[@]}"; do
-  IFS=$'\t' read -r plugin_id repo version <<<"$entry"
-  if jq -e --arg id "$plugin_id" --arg version "$version" \
-    '.result.plugins[]? | select(.plugin_id == $id and .version == $version)' \
+  IFS=$'\t' read -r plugin_id repo tag commit <<<"$entry"
+  if jq -e --arg id "$plugin_id" --arg commit "$commit" \
+    '.result.plugins[]? | select(.plugin_id == $id and .source.resolved_commit == $commit)' \
     >/dev/null <<<"$installed"; then
     continue
   fi
-  echo "Installing $plugin_id v$version..."
-  herdr plugin install "$repo" --ref "v$version" --yes
+  echo "Installing $plugin_id $tag ($commit)..."
+  herdr plugin install "$repo" --ref "$commit" --yes
 done
 {{- end }}

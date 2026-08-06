@@ -186,12 +186,29 @@ fullerzz.sesh:fullerzz/herdr-plugin-sesh"
 	installed_plugins="$(herdr plugin list --json 2>/dev/null)"
 	while IFS=: read -r plugin_id repo; do
 		[ -n "$plugin_id" ] || continue
-		report "herdr/$plugin_id" \
-			"$(printf '%s' "$installed_plugins" | jq -r --arg id "$plugin_id" \
-				'.result.plugins[]? | select(.plugin_id == $id) | .version' 2>/dev/null)" \
-			"$(github_latest_tag "$repo")" \
-			"$scripts/…30-install-herdr-plugins" \
-			"$(github_tag_date "$repo")"
+		# Compare commits, not manifest versions: worktrunk declares 0.1.0 at tag
+		# v0.5.0, so a version check would call it stale forever.
+		have="$(printf '%s' "$installed_plugins" | jq -r --arg id "$plugin_id" \
+			'.result.plugins[]? | select(.plugin_id == $id) | .source.resolved_commit' 2>/dev/null)"
+		want_tag="$(github_latest_tag "$repo")"
+		want="$(github_json "repos/$repo/tags" |
+			jq -r --arg t "$want_tag" '.[] | select(.name == $t) | .commit.sha' 2>/dev/null)"
+		name="herdr/$plugin_id"
+		if [ -z "$have" ] || [ -z "$want" ]; then
+			printf '  %-38s %-11s %-11s %s\n' "$name" "$(printf '%.9s' "$have")" \
+				"${want_tag:-?}" "no se pudo resolver"
+			unknown=$((unknown + 1))
+		elif [ "$have" = "$want" ]; then
+			printf '  %-38s %-11s %s\n' "$name" "$want_tag" "al día"
+		elif too_new "$(github_tag_date "$repo")"; then
+			printf '  %-38s %-11s %-11s %s\n' "$name" "$(printf '%.9s' "$have")" \
+				"$want_tag" "en cuarentena, <7d"
+			quarantined=$((quarantined + 1))
+		else
+			printf '  %-38s %-11s %-11s %s\n' "$name" "$(printf '%.9s' "$have")" \
+				"$want_tag" "$scripts/…30-install-herdr-plugins"
+			behind=$((behind + 1))
+		fi
 	done <<EOF
 $plugins
 EOF

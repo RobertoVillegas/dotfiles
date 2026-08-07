@@ -12,7 +12,6 @@ prompt pure 2>/dev/null || true
 
 [[ -d "$HOME/go/bin" ]] && export PATH="$HOME/go/bin:$PATH"
 [[ -d "$HOME/.druk/bin" ]] && export PATH="$HOME/.druk/bin:$PATH"
-[[ -d "$HOME/.opencode/bin" ]] && export PATH="$HOME/.opencode/bin:$PATH"
 
 # Homebrew libraries used by local builds. These kegs are not linked into the
 # prefix, so a build has to be pointed at them explicitly -- psql and anything
@@ -47,14 +46,9 @@ fi
 
 command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
 
-if command -v brew >/dev/null 2>&1; then
-  fzf_prefix="$(brew --prefix)/opt/fzf/shell"
-  [[ -r "$fzf_prefix/completion.zsh" ]] && source "$fzf_prefix/completion.zsh"
-  [[ -r "$fzf_prefix/key-bindings.zsh" ]] && source "$fzf_prefix/key-bindings.zsh"
-  unset fzf_prefix
-fi
-# Written by `fzf --install` on machines that ran it before Homebrew's fzf.
-[[ -r "$HOME/.fzf.zsh" ]] && source "$HOME/.fzf.zsh"
+# `fzf --zsh` supersedes sourcing completion.zsh and key-bindings.zsh
+# separately, and is what upstream ships since 0.48.
+command -v fzf >/dev/null 2>&1 && source <(fzf --zsh)
 
 {{ if and (eq .chezmoi.os "darwin") (eq .role "workstation") -}}
 export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"

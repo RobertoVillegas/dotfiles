@@ -1,0 +1,13 @@
+# Cada workspace remoto aparece como "<clave>: <nombre>" en el sidebar, así que
+# la clave es la etiqueta. target es lo que reciba ssh.
+#
+# remote_bin es necesario porque el plugin asume ~/.local/bin/herdr y en ambas
+# máquinas herdr viene de Homebrew.
+
+[hosts.devbox]
+target = "devbox"
+remote_bin = "/opt/homebrew/bin/herdr"
+
+[hosts.gpu]
+target = "devbox-gpu"
+remote_bin = "/home/linuxbrew/.linuxbrew/bin/herdr"

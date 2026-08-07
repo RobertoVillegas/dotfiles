@@ -59,3 +59,8 @@ Library/Preferences
 {{ if ne .role "devbox" }}
 .config/git/allowed_signers
 {{ end }}
+
+{{/* Espejear las devbox sólo tiene sentido desde la máquina donde te sientas. */}}
+{{ if ne .role "workstation" }}
+.config/herdr-mirror
+{{ end }}

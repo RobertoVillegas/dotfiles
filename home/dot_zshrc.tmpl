@@ -81,19 +81,6 @@ unset _uv_comp
 # worktrunk: shell integration gives wt switch its directory jump.
 command -v wt >/dev/null 2>&1 && eval "$(wt config shell init zsh)"
 
-# sup prints the chosen repo to a temp file and cannot cd the calling shell
-# itself, so this wrapper is what turns a selection into an actual jump.
-if command -v sup >/dev/null 2>&1; then
-  sup() {
-    rm -f /tmp/sup-selection
-    command sup "$@"
-    if [[ -f /tmp/sup-selection ]]; then
-      cd "$(cat /tmp/sup-selection)"
-      rm -f /tmp/sup-selection
-    fi
-  }
-fi
-
 # Manual Homebrew maintenance. dotfiles-autoupdate deliberately leaves casks
 # alone; this is where they get upgraded, with someone watching.
 brewm() {

@@ -1,0 +1,7 @@
+# auto detecta el fondo de la terminal, así que sigue al sistema en la laptop y
+# a la app de SSH cuando entras desde el teléfono. Existe auto:system, que lee
+# la preferencia de macOS, pero es sólo macOS y estas dotfiles también corren
+# en Linux.
+--theme=auto
+--theme-dark=Catppuccin Frappe
+--theme-light=Catppuccin Latte

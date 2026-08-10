@@ -3,5 +3,5 @@
 # la preferencia de macOS, pero es sólo macOS y estas dotfiles también corren
 # en Linux.
 --theme=auto
---theme-dark=Catppuccin Frappe
---theme-light=Catppuccin Latte
+--theme-dark="Catppuccin Frappe"
+--theme-light="Catppuccin Latte"

@@ -88,6 +88,10 @@ backend = "npm:agent-browser"
 version = "0.0.178"
 backend = "npm:dev3000"
 
+[[tools."npm:t3"]]
+version = "0.0.33"
+backend = "npm:t3"
+
 [[tools.pnpm]]
 version = "11.20.0"
 backend = "aqua:pnpm/pnpm"

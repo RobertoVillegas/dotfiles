@@ -114,8 +114,10 @@ cask "orbstack"
 {{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") (eq .role "devbox") }}
 
 # Headless macOS host. Tailscale and OrbStack still have app bundles, but no
-# workstation applications are installed.
+# workstation applications are installed. T3 Code is the server and control
+# surface for the agents that already live on this host.
 cask "tailscale-app"
+cask "t3-code"
 {{- if or (eq .container "auto") (eq .container "orbstack") }}
 cask "orbstack"
 {{- end }}

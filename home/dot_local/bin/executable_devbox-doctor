@@ -29,9 +29,44 @@ if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>
   gpu-doctor || failures=$((failures + 1))
 fi
 
-for command_name in git gh ghui jq yq mosh-server node npm pnpm bun mise herdr agy codex claude opencode pi ax agent-browser fastfetch btm btop lazydocker lazygit delta druk zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
+for command_name in git gh ghui jq yq mosh-server node npm pnpm bun mise herdr agy codex claude opencode pi t3 ax agent-browser fastfetch btm btop lazydocker lazygit delta druk zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
   check_command "$command_name"
 done
+
+if command -v node >/dev/null 2>&1; then
+  node_version="$(node -p 'process.versions.node' 2>/dev/null || true)"
+  node_major="${node_version%%.*}"
+  node_rest="${node_version#*.}"
+  node_minor="${node_rest%%.*}"
+  if { [ "$node_major" -eq 22 ] && [ "$node_minor" -ge 16 ]; } 2>/dev/null ||
+    { [ "$node_major" -eq 23 ] && [ "$node_minor" -ge 11 ]; } 2>/dev/null ||
+    { [ "$node_major" -ge 24 ]; } 2>/dev/null; then
+    pass "Node $node_version satisfies T3 Code's runtime requirement"
+  else
+    fail "Node ${node_version:-unknown} does not satisfy T3 Code (^22.16 || ^23.11 || >=24.10)"
+  fi
+fi
+
+if [ "$(uname -s)" = "Linux" ]; then
+  t3_service_status="$(t3 service status 2>/dev/null || true)"
+  if printf '%s' "$t3_service_status" | grep -q 'Status: not installed'; then
+    fail "T3 Code background service is not installed"
+  elif command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet t3code.service; then
+    pass "T3 Code background service is active"
+    if printf '%s' "$t3_service_status" | grep -q 'needs an update or repair'; then
+      warn "T3 Code service version differs from the pinned CLI; check the connected client's version before updating"
+    fi
+  else
+    fail "T3 Code background service is installed but inactive"
+  fi
+elif [ "$(uname -s)" = "Darwin" ]; then
+  if [ -d "/Applications/T3 Code (Alpha).app" ] || [ -d "$HOME/Applications/T3 Code (Alpha).app" ] ||
+    [ -d "/Applications/T3 Code.app" ] || [ -d "$HOME/Applications/T3 Code.app" ]; then
+    pass "T3 Code desktop/server app is installed"
+  else
+    fail "T3 Code desktop/server app is not installed"
+  fi
+fi
 
 if [ "$(uname -s)" = "Darwin" ]; then
   check_command mo

@@ -1,0 +1,36 @@
+{{- if and (eq .chezmoi.os "linux") (eq .profile "dev") (eq .role "devbox") -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+# mise installs a pinned T3 CLI before this script. The service owns its runtime
+# state and exact server versions; chezmoi only performs the first registration.
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+command -v t3 >/dev/null 2>&1 || {
+  echo "t3 is unavailable; install the mise tool inventory first." >&2
+  exit 1
+}
+
+if ! command -v systemctl >/dev/null 2>&1 || ! systemctl --user show-environment >/dev/null 2>&1; then
+  echo "T3 background service skipped: no usable systemd user manager." >&2
+  echo "Use 't3 serve --tailscale-serve' or install the service after enabling systemd." >&2
+  exit 0
+fi
+
+service_status="$(t3 service status 2>/dev/null || true)"
+case "$service_status" in
+  *"Status: not installed"*) ;;
+  *"Status: installed"* | *"Status: needs an update or repair"*)
+    echo "T3 background service is already installed."
+    exit 0
+    ;;
+  *)
+    echo "Unable to determine T3 background service status." >&2
+    exit 1
+    ;;
+esac
+
+t3 service install
+echo "T3 background service installed. Pair a client manually with: t3 pair --tailscale"
+{{- end }}

@@ -54,6 +54,7 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 
 - SSH y Mosh sobre Tailscale.
 - Herdr, Hunk, tmux y herramientas de terminal.
+- T3 Code como control surface de Codex, Claude Code y OpenCode en la devbox.
 - Node LTS, npm, pnpm, Bun y CLIs globales administrados por mise.
 - Antigravity, Codex, Claude Code, OpenCode, Pi, LazyPi y Prime Agent.
 - Ax y Agent Browser para acceso y automatización web.
@@ -76,6 +77,9 @@ La configuración de SSH, GitHub, firmas y acceso remoto está documentada en la
 ```sh
 devbox-doctor
 ```
+
+La instalación, pairing por Tailscale y política de checkouts de T3 están en la
+[guía de T3 Code](docs/t3-code.md).
 
 ## Minimal
 
@@ -174,7 +178,7 @@ robada sería ejecución de código en las dos devbox. Tres capas:
 
 3. **`npm_config_ignore_scripts`.** Bloquea los `preinstall`/`postinstall`, que
    corren como tú al instalar y son la vía clásica para robar llaves y tokens.
-   Los seis CLIs se reinstalaron con esto y siguen funcionando, así que no hubo
+   Estos CLIs se reinstalaron con esto y siguen funcionando, así que no hubo
    que exceptuar ninguno.
 
 4. **Cuarentena de 24 horas.** Un paquete envenenado casi siempre se retira en

@@ -18,6 +18,14 @@ Run `devbox-doctor`, `wsl-doctor`, and `gpu-doctor`. Set digest-pinned official 
 
 Remote access is `ssh -p 2222 USER@WINDOWS_TAILSCALE_IP`; recover a session with `tmux attach -t dev`. Forward dashboards with `ssh -L 6006:127.0.0.1:6006 -p 2222 USER@WINDOWS_TAILSCALE_IP`. Mirrored networking is preferred. If it fails, document the reason, switch to NAT, add a narrow Windows portproxy and updater task, and keep external port 2222.
 
+T3 Code runs as the official systemd user service inside Ubuntu. Its managed
+`tailscale` wrapper calls the Windows CLI, so `t3 pair --tailscale` publishes the
+WSL backend through the Windows-owned tailnet without adding Linux `tailscaled`.
+This path requires Windows to reach WSL loopback under mirrored networking; see
+[T3 Code](t3-code.md) before configuring pairing or Tailscale Serve. Run the
+pairing command through `wsl.exe` from elevated PowerShell if Windows requires
+administrator rights to change its Serve map.
+
 ## Operation and rollback
 
 Use `windows/devbox-mode.ps1 -Mode Training`, `Balanced`, or `Gaming`. Gaming refuses active containers; checkpoint first. `tmux` survives disconnects but not Windows restarts or `wsl --shutdown`.

@@ -1,6 +1,15 @@
 #!/bin/sh
 set -eu
 
+{{ if eq .target "wsl" -}}
+windows_cli="/mnt/c/Program Files/Tailscale/tailscale.exe"
+if [ ! -x "$windows_cli" ]; then
+  echo "Windows Tailscale CLI not found at $windows_cli" >&2
+  exit 127
+fi
+
+exec "$windows_cli" "$@"
+{{ else -}}
 app_cli="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 if [ ! -x "$app_cli" ]; then
   echo "Tailscale CLI not found at $app_cli" >&2
@@ -9,3 +18,4 @@ fi
 
 export TAILSCALE_BE_CLI=1
 exec "$app_cli" "$@"
+{{ end -}}

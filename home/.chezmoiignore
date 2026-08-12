@@ -48,7 +48,7 @@ Library/Preferences
 .local
 {{ end }}
 
-{{ if and (eq .role "devbox") (ne .chezmoi.os "darwin") }}
+{{ if and (eq .role "devbox") (ne .chezmoi.os "darwin") (ne .target "wsl") }}
 .local/bin/tailscale
 {{ end }}
 

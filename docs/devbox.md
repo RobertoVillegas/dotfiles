@@ -19,6 +19,12 @@ Herdr, skill-discovery, and Context7 documentation skills, and LazyPi's complete
 public Pi catalog. macOS receives Tailscale and OrbStack; Linux receives Docker
 clients but leaves the daemon to the distribution package manager.
 
+T3 Code provides a remote control surface over the Codex, Claude Code, and
+OpenCode installations already on the host. On macOS the T3 app owns the server;
+on native Linux the official systemd user service is installed once. Pairing,
+Tailscale Serve, projects, and Git workspace policy require deliberate setup and
+are documented in [T3 Code](t3-code.md).
+
 The CLI toolbox includes Fastfetch, bottom, btop, dust, duf, procs, just,
 Watchexec, Hyperfine, yq, ShellCheck, shfmt, Git LFS, and tealdeer. LazyGit and
 Delta cover local Git work, ghui covers GitHub pull requests and Actions, and

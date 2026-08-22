@@ -42,10 +42,65 @@ Tailscale y Zen. Durante el setup se puede elegir Zed, VS Code, ambos o ninguno.
 Las skills portables de Herdr, descubrimiento y documentación actual se
 comparten con el perfil devbox.
 
-Las aplicaciones personales son opcionales:
+### Preparar una Mac personal
+
+Antes de empezar:
+
+- Inicia sesión en Mac App Store para que `mas` pueda instalar Flow.
+- Instala y desbloquea 1Password si usarás su agente SSH.
+- Ten preparada la llave SSH asociada con GitHub si vas a editar y hacer push.
+- Espera solicitudes de la contraseña de macOS para instaladores como Tailscale.
+
+En la computadora principal conviene clonar primero el repositorio. Así la fuente
+de chezmoi queda enlazada con el clon editable en `~/Developer/dotfiles`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/RobertoVillegas/dotfiles/main/bootstrap | bash -s -- --dev --personal
+mkdir -p ~/Developer
+git clone git@github.com:RobertoVillegas/dotfiles.git ~/Developer/dotfiles
+cd ~/Developer/dotfiles
+./bootstrap --dev --personal --editor=both --target=macos --container=auto
+exec zsh -l
+```
+
+Si todavía no hay acceso SSH a GitHub, la instalación completa también puede
+arrancarse por HTTPS sin conservar un clon editable en `~/Developer`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/RobertoVillegas/dotfiles/main/bootstrap \
+  | bash -s -- --dev --personal --editor=both --target=macos --container=auto
+exec zsh -l
+```
+
+Algunas aplicaciones personales con licencia no están en Homebrew. Consulta
+[la lista y sus fuentes](docs/personal-apps.md) después del bootstrap.
+
+### Verificar una workstation
+
+```sh
+chezmoi diff
+brew bundle check --file="$HOME/.config/dotfiles/Brewfile"
+mise ls
+git config user.name
+git config user.email
+ssh -T git@github.com
+```
+
+`chezmoi diff` no debe mostrar nada y `brew bundle check` debe confirmar que el
+Brewfile está satisfecho. GitHub debe responder con el usuario esperado.
+
+Las advertencias de un instalador sobre `~/.local/bin` pueden aparecer antes de
+que el shell recargue los archivos recién aplicados. Ejecuta `exec zsh -l` y
+comprueba de nuevo con `command -v chezmoi claude ax`.
+
+### Reanudar una instalación
+
+El bootstrap es idempotente. Si una descarga, Homebrew o un instalador falla:
+
+```sh
+cd ~/Developer/dotfiles
+git pull --ff-only
+./bootstrap --dev --personal --editor=both --target=macos --container=auto
+exec zsh -l
 ```
 
 ## Devbox
@@ -95,13 +150,15 @@ El repositorio es público y no administra credenciales, llaves SSH, sesiones,
 memoria de agentes ni tokens. Cada herramienta conserva su autenticación en la
 máquina correspondiente.
 
-La identidad y firma de Git específicas de una máquina viven en
-`~/.gitconfig.local`, que se incluye desde la configuración global pero no se
-versiona. La identidad inicial puede indicarse durante bootstrap:
+La identidad inicial puede indicarse durante bootstrap. Chezmoi la conserva en
+los datos de esa máquina y la renderiza en `~/.gitconfig`:
 
 ```sh
 DOTFILES_GIT_NAME="Your Name" DOTFILES_GIT_EMAIL="you@example.com" ./bootstrap
 ```
+
+`~/.gitconfig.local` se incluye al final y no se versiona; úsalo para overrides
+o firma específicos de una máquina sin cambiar el repositorio.
 
 ## Actualizar
 
@@ -159,7 +216,7 @@ copia en brew es peso muerto que además deriva.
 ### Seguridad de la cadena de suministro
 
 El auto-update ejecuta lo que llegue a `origin/main`, así que una credencial
-robada sería ejecución de código en las dos devbox. Tres capas:
+robada sería ejecución de código en las dos devbox. Cuatro capas:
 
 1. **Firma verificada antes de aplicar.** `dotfiles-autoupdate` hace fetch,
    verifica que el commit venga firmado por una llave en

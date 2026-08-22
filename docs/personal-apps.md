@@ -4,6 +4,10 @@ These personal-workstation apps are not available as Homebrew casks, so the
 Brewfile cannot install them. After running bootstrap with `--personal`,
 install each one manually.
 
+At the end of a personal macOS workstation setup, `bootstrap` checks
+`/Applications` and `~/Applications` and prints only the apps from this list
+that are still missing.
+
 | App | Developer | Source |
 | --- | --- | --- |
 | Ports | Alexander Tapper (`com.atapper.Ports`) | Direct download; reuse the original purchase email or license link. |

@@ -76,7 +76,8 @@ exec zsh -l
 ```
 
 Algunas aplicaciones personales con licencia no están en Homebrew. Consulta
-[la lista y sus fuentes](docs/personal-apps.md) después del bootstrap.
+[la lista y sus fuentes](docs/personal-apps.md) después del bootstrap. Al
+terminar, el instalador muestra cuáles de esas apps todavía faltan.
 
 ### Verificar una workstation
 

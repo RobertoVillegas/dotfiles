@@ -67,6 +67,34 @@ read_yes_no() {
   done
 }
 
+print_missing_personal_apps() {
+  local app developer source
+  local heading_printed=false
+
+  while IFS='|' read -r app developer source; do
+    if [[ -d "/Applications/$app.app" || -d "$HOME/Applications/$app.app" ]]; then
+      continue
+    fi
+    if ! $heading_printed; then
+      echo
+      echo "Personal apps still requiring manual installation:"
+      heading_printed=true
+    fi
+    printf '  - %s — %s\n    %s\n' "$app" "$developer" "$source"
+  done <<'EOF'
+Ports|Alexander Tapper|Reuse the original purchase email or license link.
+SwitchBar|WebCatalog|https://webcatalog.io/en/switchbar
+Sleeve|Replay Software|https://replay.software/sleeve
+EOF
+
+  if $heading_printed; then
+    echo "  Details: docs/personal-apps.md"
+  else
+    echo
+    echo "All manually installed personal apps were found."
+  fi
+}
+
 interactive_setup() {
   local choice
   exec 3<"$prompt_input"
@@ -295,4 +323,7 @@ chezmoi "${source_args[@]}" apply
 
 echo
 echo "Dotfiles applied: profile=$profile role=$role target=$target gpu=$gpu container=$container remote-owner=$remote_owner editor=$editor personal=$personal"
+if [[ "$target" == "macos" && "$role" == "workstation" && "$personal" == "true" ]]; then
+  print_missing_personal_apps
+fi
 echo "Restart the shell with: exec zsh -l"

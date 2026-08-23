@@ -11,7 +11,6 @@ autoload -Uz promptinit && promptinit
 prompt pure 2>/dev/null || true
 
 [[ -d "$HOME/go/bin" ]] && export PATH="$HOME/go/bin:$PATH"
-[[ -d "$HOME/.druk/bin" ]] && export PATH="$HOME/.druk/bin:$PATH"
 
 # Homebrew libraries used by local builds. These kegs are not linked into the
 # prefix, so a build has to be pointed at them explicitly -- psql and anything

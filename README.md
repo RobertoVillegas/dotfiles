@@ -117,7 +117,8 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 - Skills globales para Herdr, descubrimiento y documentación.
 - Fastfetch, bottom/btop y utilidades modernas para procesos, disco, tareas y archivos.
 - LazyGit y Delta para Git, ghui para pull requests y LazyDocker para contenedores.
-- Druk como editor de código en la terminal.
+- Druk como editor TUI ligero y terminal-code (`tode`) para ejecutar una
+  experiencia compatible con VS Code dentro de la terminal.
 - Mole (`mo`) para mantenimiento y análisis interactivo de macOS.
 - Tailscale Serve para compartir servicios de desarrollo.
 - OrbStack en macOS o clientes de Docker en Linux.
@@ -270,7 +271,8 @@ Las versiones viven junto a cada instalador:
 | --- | --- |
 | node, pnpm, bun y CLIs de npm | `dot_config/mise/config.toml.tmpl` |
 | Claude Code | `run_onchange_after_20-install-runtime-tools.sh.tmpl` |
-| Ax, druk, LazyPi, Prime Agent | su propio `run_onchange_after_*` |
+| Druk | `dot_config/dotfiles/Brewfile.tmpl` (`letstri/tap`) |
+| Ax, terminal-code, LazyPi, Prime Agent | su propio `run_onchange_after_*` |
 | Plugins de Herdr | `run_onchange_after_30-install-herdr-plugins.sh.tmpl` (`--ref`) |
 
 Antigravity es la excepción: su instalador sólo acepta `--dir` y siempre baja la

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{ if eq .profile "dev" -}}
+version="0.2.0"
+target=""
+sha256=""
+
+# The template renders this to a platform constant on each machine.
+# shellcheck disable=SC2194
+case "{{ .chezmoi.os }}-{{ .chezmoi.arch }}" in
+  darwin-arm64)
+    target="darwin-arm64"
+    sha256="a7d868bf5815a6c1ec86801820dd3e46a8a937e118e4a4a16c7fe93aa6c2f1be"
+    ;;
+  linux-arm64)
+    target="linux-arm64"
+    sha256="8b891e84aea13e57ae689e0fcf66594cac98f9a3da953c1fd87b5740bd08acd2"
+    ;;
+  linux-amd64)
+    target="linux-x64"
+    sha256="83ea56fd2a2fc02af6a19e97d361008a9af85388231130e037f6e73f4ac831fb"
+    ;;
+  *)
+    echo "terminal-code ${version} does not support {{ .chezmoi.os }}/{{ .chezmoi.arch }}; skipping" >&2
+    exit 0
+    ;;
+esac
+
+app="$HOME/.local/lib/tode"
+bin_home="${XDG_BIN_HOME:-$HOME/.local/bin}"
+marker="$app/.dotfiles-version"
+
+if [[ -x "$bin_home/tode" && -f "$marker" && "$(<"$marker")" == "$version" ]]; then
+  exit 0
+fi
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+archive="$tmp/tode.tar.gz"
+url="https://github.com/zenbu-labs/terminal-code/releases/download/v${version}/tode-${target}.tar.gz"
+
+curl -fL --retry 3 --retry-delay 2 "$url" -o "$archive"
+echo "$sha256  $archive" | shasum -a 256 -c -
+
+rm -rf "$app.new"
+mkdir -p "$app.new"
+tar -xzf "$archive" -C "$app.new" --strip-components 1
+[[ -f "$app.new/dist/main.js" && -f "$app.new/bin/tode" ]]
+printf '%s\n' "$version" > "$app.new/.dotfiles-version"
+
+rm -rf "$app.old"
+[[ -d "$app" ]] && mv "$app" "$app.old"
+mv "$app.new" "$app"
+rm -rf "$app.old"
+
+mkdir -p "$bin_home"
+cp "$app/bin/tode" "$bin_home/tode"
+chmod +x "$bin_home/tode"
+{{ else -}}
+:
+{{ end -}}

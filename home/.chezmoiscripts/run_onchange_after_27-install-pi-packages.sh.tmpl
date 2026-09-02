@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
+
+{{- if and (eq .profile "dev") (eq .role "devbox") }}
+
+if ! command -v pi >/dev/null 2>&1; then
+  echo "pi is unavailable; cannot install pi packages." >&2
+  exit 1
+fi
+
+# Our own list, replacing the @robzolkos/lazypi public catalog: that catalog was
+# a third party deciding what a new devbox gets, and it shipped 22 extensions we
+# never chose. This array is the source of truth instead.
+#
+# npm sources carry no version on purpose -- `pi install` accepts a ref only for
+# git sources, and pi itself is pinned in dot_config/mise/config.toml.tmpl. Pin a
+# git source as `git:host/owner/repo@<commit>` when one is added here.
+#
+# Credentials, sessions, memory and the ~/.pi/agent/agents drop-ins stay
+# unmanaged: they are machine data, not configuration.
+packages=(
+  npm:pi-web-access
+  npm:pi-mcp-adapter
+  npm:pi-subagents
+  npm:@narumitw/pi-goal
+  npm:pi-fabric
+  npm:pi-memory
+  npm:@trevonistrevon/pi-loop
+  npm:pi-claude-bridge
+  npm:pi-cursor-sdk
+)
+
+settings="$HOME/.pi/agent/settings.json"
+
+for src in "${packages[@]}"; do
+  if [ -f "$settings" ] &&
+    jq -e --arg s "$src" '.packages[]? | select(. == $s)' "$settings" >/dev/null; then
+    continue
+  fi
+  echo "Installing $src..."
+  pi install "$src"
+done
+{{- end }}

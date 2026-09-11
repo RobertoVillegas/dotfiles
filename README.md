@@ -116,7 +116,7 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 - Herdr, Hunk, tmux y herramientas de terminal.
 - T3 Code como control surface de Codex, Claude Code y OpenCode en la devbox.
 - Node LTS, npm, pnpm, Bun y CLIs globales administrados por mise.
-- Antigravity, Codex, Claude Code, OpenCode, Pi, LazyPi y Prime Agent.
+- Antigravity, Codex, Claude Code, OpenCode, Pi y Prime Agent.
 - Ax y Agent Browser para acceso y automatización web.
 - Context7 por CLI para consultar documentación actual, sin MCP.
 - Skills globales para Herdr, descubrimiento y documentación.

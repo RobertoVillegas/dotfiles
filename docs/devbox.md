@@ -14,10 +14,11 @@ Tailscale, OrbStack, and agent CLIs are reused or updated in place.
 
 The role installs the portable development toolchain, Mosh, Hunk, Herdr, the
 `herdr-file-viewer` and Termscope plugins, agent CLIs, Ax, Agent Browser,
-the shared devbox context, global networking, browser-automation,
-Herdr, skill-discovery, and Context7 documentation skills, and LazyPi's complete
-public Pi catalog. macOS receives Tailscale and OrbStack; Linux receives Docker
-clients but leaves the daemon to the distribution package manager.
+the shared devbox context, global networking, browser-automation, Herdr,
+skill-discovery, Context7 documentation skills, and the reviewed Pi extension
+set shared with workstations. macOS receives Tailscale and OrbStack; Linux
+receives Docker clients but leaves the daemon to the distribution package
+manager.
 
 T3 Code provides a remote control surface over the Codex, Claude Code, and
 OpenCode installations already on the host. On macOS the T3 app owns the server;
@@ -34,10 +35,9 @@ terminal code editor installed from its pinned official installer into
 during SSH login. macOS also gets Mole's `mo` command for interactive
 maintenance and disk analysis.
 
-LazyPi is installed through its pinned official installer. It provisions the
-public extensions, themes, agents, skills, and Compound Engineering output, but
-the dotfiles never manage `~/.pi` itself. Pi credentials, sessions, memory,
-backups, and local settings remain machine-private.
+The dotfiles install and update the reviewed Pi extensions, including MCP,
+Claude Code, Cursor SDK, and Antigravity bridges. Pi credentials, sessions,
+memory, backups, and local settings remain machine-private.
 
 Antigravity CLI is installed from Google's native installer as `agy` in
 `~/.local/bin`. The binary manages its own updates; authentication and local

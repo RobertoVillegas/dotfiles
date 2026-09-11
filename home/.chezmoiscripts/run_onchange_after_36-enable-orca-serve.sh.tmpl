@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Re-run whenever the runner or the launchd unit changes.
+# runner: {{ include "dot_local/bin/executable_orca-serve" | sha256sum }}
+# launchd: {{ includeTemplate "private_Library/LaunchAgents/local.orca-serve.plist.tmpl" . | sha256sum }}
+
+{{ if and (eq .chezmoi.os "darwin") (eq .profile "dev") (eq .role "devbox") -}}
+label="local.orca-serve"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+uid="$(id -u)"
+
+if ! command -v orca >/dev/null 2>&1; then
+  echo "warn: orca is not on PATH; run 'brew bundle' before enabling $label" >&2
+  exit 0
+fi
+
+mkdir -p "$HOME/.local/state/orca"
+
+for domain in "gui/$uid" "user/$uid"; do
+  launchctl bootout "$domain/$label" 2>/dev/null || true
+done
+
+# Orca is an Electron app, so it wants the Aqua session that gui/ provides; the
+# user/ fallback keeps the runtime alive from an SSH-only apply but is the
+# degraded path, not the intended one.
+if launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null; then
+  echo "$label bootstrapped into gui/$uid"
+elif launchctl bootstrap "user/$uid" "$plist" 2>/dev/null; then
+  echo "warn: $label fell back to user/$uid; re-apply from a desktop session for the Aqua domain" >&2
+else
+  echo "warn: could not load $label; run 'launchctl bootstrap gui/$uid $plist' from a desktop session" >&2
+fi
+{{ else -}}
+:
+{{ end -}}

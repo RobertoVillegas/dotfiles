@@ -25,7 +25,14 @@ plugins=(
   "mirror	nikok6/herdr-mirror	v0.4.3	195398c1275f9f3d18ddff70282149005a2bec01"
 )
 
-installed="$(herdr plugin list --json)"
+if ! installed="$(herdr plugin list --json 2>&1)"; then
+  printf '%s\n' "$installed" >&2
+  if grep -q 'protocol_mismatch' <<<"$installed"; then
+    echo "warn: Herdr plugin refresh deferred until the running server is restarted" >&2
+    exit 0
+  fi
+  exit 1
+fi
 
 for entry in "${plugins[@]}"; do
   IFS=$'\t' read -r plugin_id repo tag commit <<<"$entry"

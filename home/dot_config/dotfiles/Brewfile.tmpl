@@ -46,7 +46,6 @@ brew "git-lfs"
 brew "gradle"
 brew "glow"
 brew "go"
-brew "herdr"
 brew "kitlangton/tap/ghui", trusted: true
 brew "letstri/tap/druk", trusted: true
 brew "modem-dev/tap/hunk", trusted: true
@@ -70,7 +69,6 @@ brew "tealdeer"
 brew "tokei"
 brew "watchexec"
 brew "watchman"
-brew "worktrunk"
 brew "yq"
 brew "anomalyco/tap/opencode", trusted: true
 {{- end }}
@@ -115,9 +113,9 @@ cask "orbstack"
 {{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") (eq .role "devbox") }}
 
 # Headless macOS host. Tailscale and OrbStack still have app bundles, but no
-# workstation applications are installed. T3 Code and Orca are the server and
-# control surfaces for the agents that already live on this host; Orca ships a
-# desktop bundle but runs here headless through `orca serve`.
+# workstation applications are installed. Herdr owns persistent terminals;
+# Orca stays available for clients and SSH-managed workflows without running a
+# second headless runtime on this host.
 cask "tailscale-app"
 cask "t3-code"
 cask "stablyai/orca/orca", trusted: true
@@ -135,6 +133,7 @@ brew "docker-compose"
 
 {{- if and (eq .chezmoi.os "darwin") (eq .role "workstation") .personal }}
 brew "mas"
+tap "fayazara/tap"
 cask "bartender"
 cask "batfi"
 cask "cap"
@@ -145,6 +144,7 @@ cask "stablyai/orca/orca", trusted: true
 cask "reflex-app"
 cask "rocket"
 cask "scroll-reverser"
+cask "screendrop"
 cask "spotify"
 mas "Flow", id: 1423210932
 {{- end }}

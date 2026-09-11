@@ -29,7 +29,7 @@ if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>
   gpu-doctor || failures=$((failures + 1))
 fi
 
-for command_name in git gh ghui jq yq mosh-server node npm pnpm bun mise herdr agy codex claude opencode pi t3 ax agent-browser fastfetch btm btop lazydocker lazygit delta druk zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
+for command_name in git gh ghui jq yq mosh-server node npm pnpm bun mise herdr wt portless orca agy codex claude opencode pi t3 ax agent-browser fastfetch btm btop lazydocker lazygit delta druk zoxide dust duf procs just watchexec hyperfine shellcheck shfmt git-lfs tldr; do
   check_command "$command_name"
 done
 
@@ -98,11 +98,67 @@ else
   fail "Managed Pi packages are missing: $missing_pi_packages"
 fi
 
+pi_trust="$(jq -r '.defaultProjectTrust // "ask"' "$pi_settings" 2>/dev/null || echo ask)"
+if [ "$pi_trust" = "always" ]; then
+  warn "Pi defaultProjectTrust is always; use ask or never outside known repositories"
+else
+  pass "Pi project trust defaults to $pi_trust"
+fi
+
+worktrunk_config="$HOME/.config/worktrunk/config.toml"
+if [ -f "$worktrunk_config" ] &&
+  grep -Fq 'copy-ignored = "wt step copy-ignored --require-include"' "$worktrunk_config"; then
+  pass "Worktrunk copies only repository-approved ignored files before start"
+else
+  fail "Worktrunk's guarded pre-start copy hook is missing"
+fi
+
+if command -v portless >/dev/null 2>&1; then
+  portless_diagnostic="$(portless doctor 2>&1 || true)"
+  if printf '%s' "$portless_diagnostic" | grep -q 'Summary: 0 failures, 0 warnings'; then
+    pass "Portless proxy is healthy"
+  else
+    fail "Portless doctor reported a problem"
+    printf '%s\n' "$portless_diagnostic"
+  fi
+fi
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  uid="$(id -u)"
+  if launchctl print "user/$uid/local.portless-proxy" >/dev/null 2>&1; then
+    pass "Portless proxy LaunchAgent is active"
+  else
+    fail "Portless proxy LaunchAgent is inactive"
+  fi
+elif command -v systemctl >/dev/null 2>&1; then
+  if systemctl --user is-active --quiet portless-proxy.service; then
+    pass "Portless proxy systemd service is active"
+  else
+    fail "Portless proxy systemd service is inactive"
+  fi
+fi
+
 if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
   pass "Tailscale is owned by the Windows host"
 elif command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
   pass "Tailscale is connected"
-  tailscale serve status 2>/dev/null || true
+  serve_status="$(tailscale serve status 2>/dev/null || true)"
+  printf '%s\n' "$serve_status"
+  proxy_ports="$(printf '%s\n' "$serve_status" |
+    sed -nE 's#.*proxy http://(127\.0\.0\.1|localhost):([0-9]+).*#\2#p' | sort -u)"
+  while IFS= read -r proxy_port; do
+    [ -n "$proxy_port" ] || continue
+    if [ "$(uname -s)" = "Darwin" ]; then
+      listener_ok="$(lsof -nP -iTCP:"$proxy_port" -sTCP:LISTEN 2>/dev/null || true)"
+    else
+      listener_ok="$(ss -lnt 2>/dev/null | grep -E "[:.]${proxy_port}[[:space:]]" || true)"
+    fi
+    if [ -z "$listener_ok" ]; then
+      warn "Tailscale Serve targets inactive local port $proxy_port"
+    fi
+  done <<EOF
+$proxy_ports
+EOF
 else
   warn "Tailscale is not connected or its CLI needs setup"
 fi
@@ -118,6 +174,7 @@ else
 fi
 
 for instruction_file in \
+  "$HOME/.pi/agent/AGENTS.md" \
   "$HOME/.codex/AGENTS.md" \
   "$HOME/.claude/CLAUDE.md" \
   "$HOME/.config/opencode/AGENTS.md" \

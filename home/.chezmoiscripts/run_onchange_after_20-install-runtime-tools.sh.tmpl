@@ -13,11 +13,11 @@ command -v mise >/dev/null 2>&1 || {
 }
 
 cd "$HOME"
-# An npm package can run arbitrary commands at install time via preinstall and
-# postinstall, as the invoking user, before the tool is ever used -- the classic
-# way a compromised package steals keys and tokens. Blocked by default; any CLI
-# that genuinely needs its postinstall to fetch a binary is listed below.
-export npm_config_ignore_scripts=true
+# mise blocks npm lifecycle scripts by default. The one reviewed exception,
+# Agent Browser's own binary setup, is narrowly allowlisted on that tool in the
+# mise config; do not set npm_config_ignore_scripts here or it overrides that
+# allowlist. T3 also carries a per-tool legacy peer-resolution workaround for
+# its pinned Effect beta graph.
 
 # npm.shell_out requires npm to exist before mise installs npm-backed tools.
 mise install node pnpm bun
@@ -31,7 +31,7 @@ export PATH="$MISE_DATA_DIR/shims:$PATH"
 # forward on its own between applies. Reinstalling on any mismatch would drag it
 # back down every night only for it to update itself again. Set DISABLE_AUTOUPDATER
 # in ~/.claude/settings.json if this should become a real pin.
-claude_version="2.1.223"
+claude_version="2.1.236"
 current_claude=""
 if command -v claude >/dev/null 2>&1; then
   # `claude --version` prints "<version> (Claude Code)".

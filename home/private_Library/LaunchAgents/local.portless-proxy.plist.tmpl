@@ -3,13 +3,21 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>local.orca-serve</string>
+	<string>local.portless-proxy</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>{{ .chezmoi.homeDir }}/.local/bin/orca-serve</string>
+		<string>{{ .chezmoi.homeDir }}/.local/share/mise/shims/portless</string>
+		<string>proxy</string>
+		<string>start</string>
+		<string>--foreground</string>
+		<string>--no-tls</string>
+		<string>--port</string>
+		<string>1355</string>
 	</array>
 	<key>EnvironmentVariables</key>
 	<dict>
+		<key>HOME</key>
+		<string>{{ .chezmoi.homeDir }}</string>
 		<key>PATH</key>
 		<string>{{ .chezmoi.homeDir }}/.local/share/mise/shims:{{ .chezmoi.homeDir }}/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
 	</dict>
@@ -20,10 +28,10 @@
 	<key>ThrottleInterval</key>
 	<integer>10</integer>
 	<key>ProcessType</key>
-	<string>Interactive</string>
+	<string>Background</string>
 	<key>StandardOutPath</key>
-	<string>{{ .chezmoi.homeDir }}/.local/state/orca/launchd.log</string>
+	<string>{{ .chezmoi.homeDir }}/.local/state/portless/proxy.log</string>
 	<key>StandardErrorPath</key>
-	<string>{{ .chezmoi.homeDir }}/.local/state/orca/launchd.log</string>
+	<string>{{ .chezmoi.homeDir }}/.local/state/portless/proxy.log</string>
 </dict>
 </plist>

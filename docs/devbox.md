@@ -12,8 +12,9 @@ Tailscale, OrbStack, and agent CLIs are reused or updated in place.
 
 ## Automated setup
 
-The role installs the portable development toolchain, Mosh, Hunk, Herdr, the
-`herdr-file-viewer` and Termscope plugins, agent CLIs, Ax, Agent Browser,
+The role installs the portable development toolchain, Mosh, Hunk, Herdr,
+Worktrunk, Portless, the `herdr-file-viewer` and Termscope plugins, agent CLIs,
+Ax, Agent Browser,
 the shared devbox context, global networking, browser-automation, Herdr,
 skill-discovery, Context7 documentation skills, and the reviewed Pi extension
 set shared with workstations. macOS receives Tailscale and OrbStack; Linux
@@ -25,6 +26,11 @@ OpenCode installations already on the host. On macOS the T3 app owns the server;
 on native Linux the official systemd user service is installed once. Pairing,
 Tailscale Serve, projects, and Git workspace policy require deliberate setup and
 are documented in [T3 Code](t3-code.md).
+
+Herdr is the persistent terminal runtime on the devbox. Orca Desktop stays
+installed on both hosts, but the workstation runtime is authoritative and
+reaches devbox projects over SSH. The dotfiles intentionally do not run a
+second `orca serve` process on the headless Mac.
 
 The CLI toolbox includes Fastfetch, bottom, btop, dust, duf, procs, just,
 Watchexec, Hyperfine, yq, ShellCheck, shfmt, Git LFS, and tealdeer. LazyGit and
@@ -173,17 +179,39 @@ git config user.email WORK_EMAIL
 
 ## Services
 
-Bind development servers to loopback, verify them locally, and expose only the
-requested port through Tailscale Serve:
+Run compatible HTTP development servers through Portless. The devbox profile
+starts its loopback-only proxy on port 1355 and enables tailnet sharing for each
+child process:
 
 ```sh
-tailscale serve --bg --https=3000 http://127.0.0.1:3000
+portless run --tailscale -- pnpm dev
+portless list
+```
+
+Portless removes its Tailscale registration when the child exits. After a hard
+crash, inspect ownership and clean only orphaned routes with `portless prune`.
+For raw TCP services, use a matching Tailscale Serve mapping and teardown:
+
+```sh
 tailscale serve --bg --tcp=5432 tcp://127.0.0.1:5432
 tailscale serve status
+tailscale serve --tcp=5432 off
 ```
 
 Never commit application passwords. Use ignored `.env` files or the project's
 existing secret-management mechanism.
+
+Worktrunk runs `wt step copy-ignored --require-include` before starting a new
+worktree. Repositories that need local environment files must commit a narrow
+`.worktreeinclude`, for example:
+
+```gitignore
+.env
+.env.local
+.env.*.local
+```
+
+Files must also be gitignored. A missing `.worktreeinclude` copies nothing.
 
 ## Agent web tools
 
@@ -196,8 +224,10 @@ prompt injection; other security policies remain task-specific.
 
 ## Global agent skills
 
-Codex and OpenCode discover the portable skills in `~/.agents/skills`. Claude
-Code receives symlinks to the same source files under `~/.claude/skills`.
+Codex, Pi, and OpenCode discover the portable skills in `~/.agents/skills`.
+Claude Code receives symlinks to the same source files under
+`~/.claude/skills`. Pi also receives the shared devbox policy through
+`~/.pi/agent/AGENTS.md`.
 
 - `herdr` teaches agents to inspect and control Herdr only from a managed pane.
 - `find-skills` searches the public agent-skills ecosystem.
@@ -206,8 +236,8 @@ Code receives symlinks to the same source files under `~/.claude/skills`.
   `writing-for-agents` are the reviewed Matt Pocock workflows.
 - `show-me` provides portable visual explanations, and `orchestration` connects
   agents to the Orca coordination guide when the Orca runtime is available.
-- `agent-browser` and `devbox-network` cover browser automation and private
-  service exposure.
+- `agent-browser` and `devbox-network` cover browser automation and leased,
+  private service exposure.
 
 `find-docs` calls `npx ctx7@latest` directly and does not install or configure a
 Context7 MCP server. It works without authentication at the public rate limit;

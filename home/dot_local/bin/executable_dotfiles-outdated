@@ -17,14 +17,19 @@ quarantined=0
 # Same 24-hour window the installers enforce. A version newer than this is not
 # proposed: a poisoned release is usually yanked within hours, and the only way
 # these machines would reach one is by bumping a pin during that window.
-cooldown_cutoff="$(date -u -d '1 day ago' +%Y-%m-%d 2>/dev/null ||
-	date -u -v-1d +%Y-%m-%d 2>/dev/null || echo '')"
+cooldown_cutoff_epoch="$(date -u -d '24 hours ago' +%s 2>/dev/null ||
+	date -u -v-24H +%s 2>/dev/null || echo '')"
 
 strip_v() { printf '%s' "${1#v}"; }
 
-# ISO-8601 dates compare correctly as plain strings once truncated to the day.
 too_new() {
-	[ -n "${1:-}" ] && [ -n "$cooldown_cutoff" ] && [ "${1%%T*}" \> "$cooldown_cutoff" ]
+	[ -n "${1:-}" ] && [ -n "$cooldown_cutoff_epoch" ] || return 1
+	# npm timestamps include fractional seconds, while GitHub's do not. Normalize
+	# both before asking either BSD date (macOS) or GNU date (Linux) for an epoch.
+	release_date="$(printf '%s' "$1" | sed 's/\.[0-9][0-9]*Z$/Z/')"
+	release_epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$release_date" +%s 2>/dev/null ||
+		date -u -d "$release_date" +%s 2>/dev/null || echo '')"
+	[ -n "$release_epoch" ] && [ "$release_epoch" -gt "$cooldown_cutoff_epoch" ]
 }
 
 # Unauthenticated api.github.com allows 60 requests an hour, which this report
@@ -120,7 +125,14 @@ if command -v mise >/dev/null 2>&1 && [ -f "$mise_config_file" ]; then
 		/^\[/            { in_tools = 0 }
 		in_tools && /=/ {
 			key = $0; sub(/[[:space:]]*=.*/, "", key); gsub(/["[:space:]]/, "", key)
-			val = $0; sub(/^[^=]*=[[:space:]]*/, "", val); gsub(/["[:space:]]/, "", val)
+			val = $0
+			if (val ~ /version[[:space:]]*=[[:space:]]*"/) {
+				sub(/^.*version[[:space:]]*=[[:space:]]*"/, "", val)
+				sub(/".*/, "", val)
+			} else {
+				sub(/^[^=]*=[[:space:]]*/, "", val)
+				gsub(/["[:space:]]/, "", val)
+			}
 			if (key != "" && val != "") print key, val
 		}
 	' "$mise_config_file")"

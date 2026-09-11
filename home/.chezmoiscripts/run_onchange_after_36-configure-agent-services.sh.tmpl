@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Re-run whenever either Portless unit changes.
+# launchd: {{ includeTemplate "private_Library/LaunchAgents/local.portless-proxy.plist.tmpl" . | sha256sum }}
+# systemd: {{ include "dot_config/systemd/user/portless-proxy.service" | sha256sum }}
+
+{{ if and (eq .profile "dev") (eq .role "devbox") -}}
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+{{ if eq .chezmoi.os "darwin" -}}
+uid="$(id -u)"
+
+# Retire the failed headless Orca runtime. Orca Desktop remains installed; its
+# workstation runtime reaches this host through SSH while Herdr owns persistent
+# devbox terminals.
+for domain in "gui/$uid" "user/$uid"; do
+  launchctl bootout "$domain/local.orca-serve" 2>/dev/null || true
+done
+if command -v tailscale >/dev/null 2>&1 &&
+  tailscale serve status 2>/dev/null | grep -q '127.0.0.1:6768'; then
+  tailscale serve --https=6769 off
+fi
+rm -f "$HOME/Library/LaunchAgents/local.orca-serve.plist" "$HOME/.local/bin/orca-serve"
+
+label="local.portless-proxy"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+mkdir -p "$HOME/.local/state/portless"
+
+if ! command -v portless >/dev/null 2>&1; then
+  echo "warn: portless is not on PATH; apply again after mise install" >&2
+  exit 0
+fi
+
+for domain in "user/$uid" "gui/$uid"; do
+  launchctl bootout "$domain/$label" 2>/dev/null || true
+done
+portless proxy stop >/dev/null 2>&1 || true
+
+# Portless is a headless Node process and does not need an Aqua session.
+if launchctl bootstrap "user/$uid" "$plist"; then
+  echo "$label bootstrapped into user/$uid"
+else
+  echo "warn: could not load $label; run 'launchctl bootstrap user/$uid $plist'" >&2
+fi
+{{ else -}}
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user daemon-reload
+  systemctl --user enable --now portless-proxy.service
+else
+  echo "warn: systemd user services are unavailable; start 'portless proxy start --foreground --no-tls --port 1355' manually" >&2
+fi
+{{ end -}}
+{{ else -}}
+:
+{{ end -}}

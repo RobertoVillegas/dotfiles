@@ -25,6 +25,11 @@ Library/Preferences
 {{ if ne .profile "dev" }}
 .config/ghostty
 .config/herdr
+.config/worktrunk
+{{ end }}
+
+{{ if or (ne .profile "dev") (ne .role "devbox") }}
+.pi/agent/AGENTS.md
 {{ end }}
 
 {{ if ne .profile "dev" }}

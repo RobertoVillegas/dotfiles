@@ -64,6 +64,16 @@ done
 # `pi install` skips sources already in settings; refresh those explicitly.
 pi update --extensions
 
+# Ask before loading repository-local Pi extensions, prompts, and themes. Keep
+# an explicit user choice, but do not leave fresh machines on Pi's implicit
+# default where a future upstream change could silently broaden trust.
+if [ -f "$settings" ] && [ "$(jq -r '.defaultProjectTrust // empty' "$settings")" = "" ]; then
+  settings_tmp="$(mktemp)"
+  jq '.defaultProjectTrust = "ask"' "$settings" >"$settings_tmp"
+  chmod 600 "$settings_tmp"
+  mv "$settings_tmp" "$settings"
+fi
+
 # Conservative defaults for the Antigravity bridge. The config remains
 # machine-local and user-editable after creation; chezmoi never overwrites it.
 antigravity_config="$HOME/.pi/agent/antigravity-bridge/config.json"

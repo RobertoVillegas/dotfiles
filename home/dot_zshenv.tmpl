@@ -26,3 +26,13 @@ path=(${path:#${HOME}/Library/pnpm})
 # Mark browser-derived output as untrusted content when agents automate pages.
 export AGENT_BROWSER_CONTENT_BOUNDARIES=1
 {{ end -}}
+{{ if and (eq .profile "dev") (eq .role "devbox") -}}
+# Portless owns ephemeral HTTP routes. Tailscale exposure follows the child
+# process lifecycle; Funnel and LAN exposure stay off by default.
+export PORTLESS_PORT=1355
+export PORTLESS_HTTPS=0
+export PORTLESS_TAILSCALE=1
+export PORTLESS_FUNNEL=0
+export PORTLESS_LAN=0
+export PORTLESS_SYNC_HOSTS=0
+{{ end -}}

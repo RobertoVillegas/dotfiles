@@ -1,0 +1,14 @@
+[Unit]
+Description=Portless development proxy
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=HOME=%h
+Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/bin:/bin
+ExecStart=%h/.local/share/mise/shims/portless proxy start --foreground --no-tls --port 1355
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

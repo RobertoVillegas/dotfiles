@@ -125,7 +125,8 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 - Druk como editor TUI ligero y terminal-code (`tode`) para ejecutar una
   experiencia compatible con VS Code dentro de la terminal.
 - Mole (`mo`) para mantenimiento y análisis interactivo de macOS.
-- Tailscale Serve para compartir servicios de desarrollo.
+- Portless para servicios HTTP con exposición privada por Tailscale y teardown
+  ligado al proceso; Tailscale Serve directo queda para TCP y fallbacks.
 - OrbStack en macOS o clientes de Docker en Linux.
 
 ```sh
@@ -239,10 +240,11 @@ robada sería ejecución de código en las dos devbox. Cuatro capas:
    `npm:` y rust quedan fuera porque esos backends delegan la descarga a npm y
    rustup, que no le entregan a mise nada que verificar.
 
-3. **`npm_config_ignore_scripts`.** Bloquea los `preinstall`/`postinstall`, que
-   corren como tú al instalar y son la vía clásica para robar llaves y tokens.
-   Estos CLIs se reinstalaron con esto y siguen funcionando, así que no hubo
-   que exceptuar ninguno.
+3. **Scripts npm bloqueados por defecto.** mise bloquea los
+   `preinstall`/`postinstall`, que corren como tú al instalar y son la vía
+   clásica para robar llaves y tokens. Agent Browser necesita preparar su
+   binario, así que sólo su propio script queda en `allow_builds`; no se concede
+   una excepción global ni a sus dependencias.
 
 4. **Cuarentena de 24 horas.** Un paquete envenenado casi siempre se retira en
    horas, así que el riesgo no es quedarse atrás: es instalar justo dentro de esa
@@ -274,10 +276,10 @@ Las versiones viven junto a cada instalador:
 
 | Herramienta | Dónde |
 | --- | --- |
-| node, pnpm, bun y CLIs de npm | `dot_config/mise/config.toml.tmpl` |
+| node, pnpm, bun, Herdr, Worktrunk y CLIs de npm como Portless | `dot_config/mise/config.toml.tmpl` |
 | Claude Code | `run_onchange_after_20-install-runtime-tools.sh.tmpl` |
 | Druk | `dot_config/dotfiles/Brewfile.tmpl` (`letstri/tap`) |
-| Ax, terminal-code, LazyPi, Prime Agent | su propio `run_onchange_after_*` |
+| Ax, terminal-code y Prime Agent | su propio `run_onchange_after_*` |
 | Plugins de Herdr | `run_onchange_after_30-install-herdr-plugins.sh.tmpl` (`--ref`) |
 
 Antigravity es la excepción: su instalador sólo acepta `--dir` y siempre baja la

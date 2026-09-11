@@ -2,14 +2,16 @@
 set -euo pipefail
 
 {{ if eq .profile "dev" -}}
-export PRIME_AGENT_VERSION="0.7.0"
+export PRIME_AGENT_VERSION="0.9.4"
 export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
 export PATH="$MISE_DATA_DIR/shims:$PATH"
 
 # prime-agent --version reports on stderr, so this has to merge the streams.
 current=""
 if command -v prime-agent >/dev/null 2>&1; then
-  current="$(prime-agent --version 2>&1 | tr -d '[:space:]')"
+  # mise can leave an inactive shim behind after a Node upgrade; that is not an
+  # installed Prime Agent and must not abort this set -e script.
+  current="$(prime-agent --version 2>&1 | tr -d '[:space:]' || true)"
 fi
 
 # Prime Agent is not published to the npm registry: the installer downloads a

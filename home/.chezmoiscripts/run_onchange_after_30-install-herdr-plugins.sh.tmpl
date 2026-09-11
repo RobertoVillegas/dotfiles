@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export PATH="/home/linuxbrew/.linuxbrew/bin:$HOME/.local/bin:$PATH"
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
 
 {{- if eq .profile "dev" }}
 
@@ -17,11 +18,11 @@ fi
 # manifest versions also let termscope sit on an unpinned commit while looking
 # compliant. Re-resolve with `gh api repos/<repo>/tags` when bumping.
 plugins=(
-  "herdr-file-viewer	smarzban/herdr-file-viewer	v1.15.0	a2368d701659813938f79e2f1e5aa4e9f4fb2b77"
-  "termscope	iurysza/termscope	v0.2.0	236ab631f9d4cc842e2da0a26c7310f052c11999"
-  "worktrunk	devashish2203/herdr-worktrunk	v0.5.0	a3107ca566bafcd463bc138007a0c01051970784"
-  "fullerzz.sesh	fullerzz/herdr-plugin-sesh	v0.6.0	f96324af662717b7109abb37439aad5077775bc1"
-  "mirror	nikok6/herdr-mirror	v0.1.16	a569217ae59166470aa6a1fc0bbca2dea196af64"
+  "herdr-file-viewer	smarzban/herdr-file-viewer	v1.16.0	647f03236d9aa20de0b07c9de0a951e13a1e59bf"
+  "termscope	iurysza/termscope	v0.3.0	328a777796e3e1a214da1bb6da79e4bfdf6dfabe"
+  "worktrunk	devashish2203/herdr-worktrunk	v0.7.0	9cde723b7c6ea5d3f4de94760888de0e4090727b"
+  "fullerzz.sesh	fullerzz/herdr-plugin-sesh	v0.11.0	881858c7520f3cbe3fd2b95039fa4cc2ecc9a361"
+  "mirror	nikok6/herdr-mirror	v0.4.3	195398c1275f9f3d18ddff70282149005a2bec01"
 )
 
 installed="$(herdr plugin list --json)"

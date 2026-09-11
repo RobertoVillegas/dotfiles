@@ -15,14 +15,28 @@
 - Use the package manager and commands already selected by each repository.
 - mise provides Node, npm, pnpm, and Bun; do not create competing lockfiles or migrate package managers implicitly.
 - Avoid duplicate databases, container stacks, watchers, and development servers.
+- Worktrunk owns normal worktree naming and lifecycle. Keep one writer per checkout.
+- A repository opts into copying ignored environment files by committing `.worktreeinclude`; Worktrunk completes that copy before a new worktree starts work.
+
+## Agent runtimes
+
+- Use Herdr for persistent terminal work on this host.
+- Use Orca only for explicitly requested structured orchestration. Orca and Herdr must not own the same terminal, process, or writable checkout.
+- Control a Herdr or Orca session only from the runtime context exported to the current agent.
 
 ## Networking
 
 - Local services must remain private to the host or tailnet.
 - Prefer loopback bindings such as `127.0.0.1:3000` and Docker mappings such as `127.0.0.1:5432:5432`.
 - Use the `devbox-network` skill when a service must be reachable from a client device.
-- Prefer Portless with its Tailscale integration for compatible HTTP development servers; use direct Tailscale Serve for raw TCP services and as a fallback.
+- Run compatible HTTP development servers through Portless; its Tailscale registration must share the child process lifecycle.
+- Use direct Tailscale Serve only for raw TCP services and incompatible HTTP servers, with a project-scoped teardown for the exact route.
 - Never use Tailscale Funnel or another public tunnel unless explicitly requested.
+
+## Trust boundary
+
+- A worktree separates files; it is not a sandbox. Use a container, VM, or separate OS user for untrusted repositories or unmonitored execution.
+- Keep Pi project trust at `ask` or `never` for unknown repositories. Review project agent resources before granting trust.
 
 ## Browser automation
 

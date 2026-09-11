@@ -125,7 +125,8 @@ fi
 
 if [ "$(uname -s)" = "Darwin" ]; then
   uid="$(id -u)"
-  if launchctl print "user/$uid/local.portless-proxy" >/dev/null 2>&1; then
+  if launchctl print "gui/$uid/local.portless-proxy" >/dev/null 2>&1 ||
+    launchctl print "user/$uid/local.portless-proxy" >/dev/null 2>&1; then
     pass "Portless proxy LaunchAgent is active"
   else
     fail "Portless proxy LaunchAgent is inactive"

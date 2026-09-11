@@ -38,11 +38,15 @@ for domain in "user/$uid" "gui/$uid"; do
 done
 portless proxy stop >/dev/null 2>&1 || true
 
-# Portless is a headless Node process and does not need an Aqua session.
-if launchctl bootstrap "user/$uid" "$plist"; then
+# LaunchAgents loaded over SSH can be rejected by user/ with EIO even when the
+# per-user GUI domain is live. Prefer that domain and retain user/ as the
+# headless fallback.
+if launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null; then
+  echo "$label bootstrapped into gui/$uid"
+elif launchctl bootstrap "user/$uid" "$plist" 2>/dev/null; then
   echo "$label bootstrapped into user/$uid"
 else
-  echo "warn: could not load $label; run 'launchctl bootstrap user/$uid $plist'" >&2
+  echo "warn: could not load $label; run 'launchctl bootstrap gui/$uid $plist'" >&2
 fi
 {{ else -}}
 if command -v systemctl >/dev/null 2>&1; then

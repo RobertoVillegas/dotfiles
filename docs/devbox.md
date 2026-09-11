@@ -202,6 +202,10 @@ Code receives symlinks to the same source files under `~/.claude/skills`.
 - `herdr` teaches agents to inspect and control Herdr only from a managed pane.
 - `find-skills` searches the public agent-skills ecosystem.
 - `find-docs` is Context7's official documentation lookup workflow.
+- `grill-me`, `grilling`, `wait-what`, `diagnosing-bugs`, `prototype`, and
+  `writing-for-agents` are the reviewed Matt Pocock workflows.
+- `show-me` provides portable visual explanations, and `orchestration` connects
+  agents to the Orca coordination guide when the Orca runtime is available.
 - `agent-browser` and `devbox-network` cover browser automation and private
   service exposure.
 

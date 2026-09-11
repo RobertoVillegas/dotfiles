@@ -42,6 +42,10 @@ Tailscale y Zen. Durante el setup se puede elegir Zed, VS Code, ambos o ninguno.
 Las skills portables de Herdr, descubrimiento y documentación actual se
 comparten con el perfil devbox.
 
+Las skills viven una sola vez en `~/.agents/skills`; Claude apunta a ellas con
+symlinks. La política y el flujo para revisar actualizaciones upstream están en
+[docs/skills.md](docs/skills.md).
+
 ### Preparar una Mac personal
 
 Antes de empezar:

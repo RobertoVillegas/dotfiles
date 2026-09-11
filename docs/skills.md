@@ -8,16 +8,22 @@ otherwise change executable agent instructions without review.
 
 ## Exact upstream skills
 
-`orchestration` is installed without local modifications. Its `npx skills`
-metadata lives in `~/.agents/.skill-lock.json`, which is also managed by
-chezmoi. Update it on the authoring workstation, then import the reviewed result
-back into the source state:
+`orchestration` is installed without local modifications. Update it on the
+authoring workstation, then import the reviewed result back into the source
+state:
 
 ```sh
 npx skills update orchestration --global
-chezmoi re-add ~/.agents/.skill-lock.json ~/.agents/skills/orchestration
+chezmoi re-add ~/.agents/skills/orchestration
 chezmoi diff
 ```
+
+The global `~/.agents/.skill-lock.json` remains machine-local. It contains the
+inventory and install timestamps for every skill installed with `npx skills` on
+that host, so synchronizing it would delete unrelated registrations on another
+machine. On a machine where `orchestration` has not been registered yet, run
+`npx skills add stablyai/orca@orchestration --global --yes` once; chezmoi still
+owns the reviewed skill contents delivered to every host.
 
 Commit and merge that change before applying it on another machine. The devbox
 does not need to contact the skill repository: its normal signed dotfiles update

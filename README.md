@@ -175,6 +175,36 @@ devbox-doctor
 La instalación, pairing por Tailscale y política de checkouts de T3 están en la
 [guía de T3 Code](docs/t3-code.md).
 
+### Flujo remoto
+
+Trabajas en el devbox desde la workstation o el móvil sobre Tailscale: las
+sesiones viven en Herdr, los agentes reparten el trabajo, y los servicios
+regresan por la tailnet.
+
+```text
+        TU LADO                                       EL DEVBOX  (headless macOS/Linux · ~/Developer)
+   workstation · móvil                                donde corre el trabajo pesado
+ ─────────────────────                              ────────────────────────────────────────────────
+
+ ┌─────────────────────┐                            ┌──────────────────────────────────────────────┐
+ │ Workstation (mac)   │                            │            H E R D R                          │
+ │   terminal · IDE    │                            │   runtime de terminal persistente             │
+ │   browser           │       Tailscale (VPN)      │                                               │
+ │   Orca (orquesta) ──┼──┐                         │   ┌────────┐  ┌────────┐  ┌────────┐   panes   │
+ └─────────────────────┘  │   ssh                   │   │ Claude │  │ Codex  │  │OpenCode│           │
+                          ├════════════════════════▶│   │  Code  │  │        │  │        │           │
+ ┌─────────────────────┐  │                         │   └───┬────┘  └────────┘  └────────┘           │
+ │ iPhone / iPad       │  │                         │       │ delega                                │
+ │  Echo · Termix ·    │  │                         │       ▼                                       │
+ │  Rootshell (SSH) ───┼──┘                         │   subagents · workflows                       │
+ └─────────────────────┘                            │   worktrunk → 1 worktree por tarea            │
+                                                    │   builds · tests · dev servers · docker       │
+                                                    └───────────────────────┬───────────────────────┘
+                                                                            │
+        browser / app  ◀════════ https, privado al tailnet ════════════════┘
+                        Portless (dev servers HTTP) · Tailscale Serve (TCP)
+```
+
 ## Minimal
 
 Para una máquina ligera con shell, Git, tmux, mise y utilidades de terminal:

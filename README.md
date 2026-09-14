@@ -22,6 +22,38 @@ El instalador muestra un menú con tres opciones:
 El proceso es idempotente, así que el mismo comando sirve para terminar una
 instalación interrumpida o aplicar una actualización.
 
+## Cómo funciona
+
+Un solo comando levanta todo: el instalador elige el perfil, y chezmoi aplica la
+configuración a `$HOME` y ejecuta los scripts que instalan las herramientas.
+
+```mermaid
+flowchart TD
+    boot["curl …/bootstrap | bash"] --> menu{"Perfil"}
+    menu -->|Workstation| w["Dev + apps de macOS"]
+    menu -->|Devbox| d["Host remoto<br/>SSH · Mosh · Tailscale"]
+    menu -->|Minimal| m["Shell + esenciales"]
+
+    w --> cz
+    d --> cz
+    m --> cz
+
+    cz["chezmoi init --apply<br/>fuente: home/"]
+    cz --> tpl["Plantillas → HOME<br/>~/.zshrc · ~/.gitconfig<br/>~/.config · ~/.ssh · agentes"]
+    cz --> scripts[".chezmoiscripts<br/>(hooks run_*)"]
+
+    scripts --> brew["Homebrew<br/>Brewfile"]
+    scripts --> mise["mise<br/>Node · pnpm · Bun · CLIs"]
+    scripts --> agents["Agentes + CLIs<br/>ax · agent-browser · pi<br/>herdr · worktrunk"]
+    scripts --> auto["dotfiles-autoupdate<br/>+ agent services"]
+
+    tpl --> done(["Entorno listo · idempotente"])
+    brew --> done
+    mise --> done
+    agents --> done
+    auto --> done
+```
+
 ## Estructura
 
 ```text

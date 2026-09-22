@@ -102,7 +102,7 @@ version = "0.0.4"
 backend = "npm:@vercel/before-and-after"
 
 [[tools."npm:agent-browser"]]
-version = "0.37.1"
+version = "0.38.1"
 backend = "npm:agent-browser"
 
 [tools."npm:agent-browser".options]

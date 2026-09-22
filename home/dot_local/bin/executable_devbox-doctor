@@ -72,6 +72,13 @@ if [ "$(uname -s)" = "Darwin" ]; then
   check_command mo
 fi
 
+# A mise shim can exist without an active installation. Execute QMD to check.
+if qmd collection list >/dev/null 2>&1; then
+  pass "QMD is available for Pi memory search"
+else
+  fail "QMD cannot run; install the pinned npm:@tobilu/qmd tool with mise"
+fi
+
 pi_settings="$HOME/.pi/agent/settings.json"
 missing_pi_packages=""
 for pi_package in \

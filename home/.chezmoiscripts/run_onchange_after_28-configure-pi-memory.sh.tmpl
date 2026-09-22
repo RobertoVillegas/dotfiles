@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{- if eq .profile "dev" }}
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
+
+# QMD owns the shared index and models. Memory files remain machine-local.
+# Pi scopes searches to pi-memory; exclude it from other clients' default queries.
+qmd collection list >/dev/null
+memory_dir="${PI_MEMORY_DIR:-$HOME/.pi/agent/memory}"
+mkdir -p "$memory_dir"
+if ! qmd collection show pi-memory >/dev/null 2>&1; then
+  qmd collection add "$memory_dir" --name pi-memory
+fi
+qmd collection exclude pi-memory
+qmd context add qmd://pi-memory/ "Curated long-term memory: decisions, preferences, facts, lessons"
+qmd context add qmd://pi-memory/daily "Daily append-only work logs organized by date"
+# pi-memory performs incremental indexing and embeddings at session startup
+# and after writes; no second daemon or scheduled job is necessary.
+{{- end }}

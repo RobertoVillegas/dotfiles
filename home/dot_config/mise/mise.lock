@@ -90,6 +90,13 @@ backend = "npm:@fission-ai/openspec"
 version = "0.154.0"
 backend = "npm:@openai/codex"
 
+[[tools."npm:@tobilu/qmd"]]
+version = "2.8.3"
+backend = "npm:@tobilu/qmd"
+
+[tools."npm:@tobilu/qmd".options]
+allow_builds = '["node-llama-cpp"]'
+
 [[tools."npm:@vercel/before-and-after"]]
 version = "0.0.4"
 backend = "npm:@vercel/before-and-after"

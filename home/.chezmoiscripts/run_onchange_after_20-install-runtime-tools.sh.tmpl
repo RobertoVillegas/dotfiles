@@ -13,11 +13,11 @@ command -v mise >/dev/null 2>&1 || {
 }
 
 cd "$HOME"
-# mise blocks npm lifecycle scripts by default. The one reviewed exception,
-# Agent Browser's own binary setup, is narrowly allowlisted on that tool in the
-# mise config; do not set npm_config_ignore_scripts here or it overrides that
-# allowlist. T3 also carries a per-tool legacy peer-resolution workaround for
-# its pinned Effect beta graph.
+# mise blocks npm lifecycle scripts by default. Agent Browser's binary setup
+# and QMD's node-llama-cpp backend setup are narrowly allowlisted per tool;
+# do not set npm_config_ignore_scripts here or it overrides those allowlists.
+# T3 also carries a per-tool legacy peer-resolution workaround for its pinned
+# Effect beta graph.
 
 # npm.shell_out requires npm to exist before mise installs npm-backed tools.
 mise install node pnpm bun

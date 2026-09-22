@@ -24,7 +24,6 @@ brew "zsh"
 {{- if eq .profile "dev" }}
 
 # Development tools.
-tap "anomalyco/tap"
 tap "letstri/tap"
 brew "act"
 brew "ast-grep"
@@ -70,7 +69,6 @@ brew "tokei"
 brew "watchexec"
 brew "watchman"
 brew "yq"
-brew "anomalyco/tap/opencode", trusted: true
 {{- end }}
 
 {{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") (eq .role "workstation") }}

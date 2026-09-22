@@ -46,4 +46,27 @@ elif [ "$current_claude" != "$claude_version" ] &&
   # --force` is what actually repoints the launcher.
   claude install "$claude_version" --force
 fi
+
+# Same floor-not-equality rule as Claude Code above: opencode ships its own
+# `upgrade` command, so it walks forward on its own between applies.
+#
+# The installer hardcodes INSTALL_DIR to ~/.opencode/bin, so the launcher is
+# exposed through ~/.local/bin like the other agent CLIs. --no-modify-path is
+# load-bearing: without it the installer appends `export PATH=...` to ~/.zshrc,
+# which chezmoi manages, so the next apply would revert it and leave opencode
+# off PATH.
+opencode_version="2.0.12"
+current_opencode=""
+if [ -x "$HOME/.opencode/bin/opencode" ]; then
+  # `opencode --version` prints "opencode v<version>".
+  current_opencode="$("$HOME/.opencode/bin/opencode" --version 2>/dev/null | awk '{print $2}' | sed 's/^v//')"
+fi
+if [ -z "$current_opencode" ] ||
+  { [ "$current_opencode" != "$opencode_version" ] &&
+    [ "$(printf '%s\n%s\n' "$opencode_version" "$current_opencode" | sort -V | head -1)" = "$current_opencode" ]; }; then
+  curl -fsSL https://opencode.ai/v2/install |
+    bash -s -- --version "$opencode_version" --no-modify-path
+fi
+mkdir -p "$HOME/.local/bin"
+ln -sfn "$HOME/.opencode/bin/opencode" "$HOME/.local/bin/opencode"
 {{- end }}

@@ -1,0 +1,3 @@
+# Tailnet HTTPS/TCP ports shared on purpose, which devbox-serve-gc never
+# withdraws even while their backend is down. One port per line.
+443  # T3 Code: `t3 pair --tailscale` publishes its private URL at the root

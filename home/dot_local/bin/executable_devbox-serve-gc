@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+# Withdraw tailnet routes whose service is gone.
+#
+#   devbox-serve-gc              remove routes dead for longer than the grace period
+#   devbox-serve-gc --dry-run    report what would be removed, change nothing
+#   devbox-serve-gc --check      list dead routes now (ignoring grace); exit 1 if any
+#   devbox-serve-gc --grace 300  seconds a backend must stay down first (default 120)
+#
+# Portless registers `tailscale serve --bg` routes, which are persisted config:
+# when its session dies without a clean exit (SIGKILL, crash, a closed pane) the
+# route outlives the dev server, and Portless can forget it before `portless
+# prune` runs. The same happens to any hand-made `--bg` route. This reconciles
+# the persisted Serve config against what is actually listening:
+#
+# - A route whose every backend is a loopback port nobody listens on, for longer
+#   than the grace period, is turned off.
+# - A foreground `tailscale serve` (an `expose` session) orphaned to init whose
+#   backend is gone is stopped, which withdraws its route.
+#
+# Never touched: routes owned by a live Portless session, non-loopback or
+# file-serving routes, and ports listed in ~/.config/devbox/serve-keep (one per
+# line; `#` starts a comment) for services that are shared on purpose.
+set -euo pipefail
+
+grace=120
+dry_run=""
+check=""
+quiet=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) dry_run=1; shift ;;
+    --check) check=1; shift ;;
+    --quiet) quiet=1; shift ;;
+    --grace) grace="${2:?--grace needs seconds}"; shift 2 ;;
+    -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "devbox-serve-gc: unknown option $1" >&2; exit 2 ;;
+  esac
+done
+
+command -v tailscale >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || { echo "devbox-serve-gc: jq not found" >&2; exit 127; }
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/devbox"
+state_file="$state_dir/serve-gc.state"
+keep_file="${XDG_CONFIG_HOME:-$HOME/.config}/devbox/serve-keep"
+routes_file="${PORTLESS_STATE_DIR:-$HOME/.portless}/routes.json"
+mkdir -p "$state_dir"
+touch "$state_file"
+
+now="$(date +%s)"
+next_state="$(mktemp)"
+trap 'rm -f "$next_state"' EXIT
+
+say() { [ -n "$quiet" ] || echo "$@"; }
+
+listening() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$1" -sTCP:LISTEN -t >/dev/null 2>&1
+  else
+    ss -Hltn "( sport = :$1 )" 2>/dev/null | grep -q .
+  fi
+}
+
+kept_ports="$(sed 's/#.*//' "$keep_file" 2>/dev/null | tr -s ' \t' '\n' | grep -E '^[0-9]+$' || true)"
+
+# Ports a live Portless session owns: its backend may still be booting.
+portless_ports=""
+if [ -f "$routes_file" ]; then
+  while read -r pid port; do
+    [ -n "$port" ] && kill -0 "$pid" 2>/dev/null && portless_ports="$portless_ports $port"
+  done < <(jq -r '.[]? | select(.tailscaleHttpsPort) | "\(.pid) \(.tailscaleHttpsPort)"' "$routes_file" 2>/dev/null || true)
+fi
+
+# "host:port" from a proxy target such as http://127.0.0.1:3000/ or 127.0.0.1:5432.
+backend_port() {
+  local target="${1#*://}"
+  target="${target%%/*}"
+  local host="${target%:*}" port="${target##*:}"
+  case "$host" in
+    127.0.0.1|localhost|::1|\[::1\]) ;;
+    *) return 1 ;;
+  esac
+  case "$port" in ''|*[!0-9]*) return 1 ;; esac
+  echo "$port"
+}
+
+# Decide one route. Prints nothing; records state and acts.
+#   $1 key for the state file, $2 label, $3 backends (comma separated),
+#   $4 command that withdraws it
+consider() {
+  local key="$1" label="$2" backends="$3" off="$4" alive="" any="" b port
+  local IFS=,
+  for b in $backends; do
+    port="$(backend_port "$b")" || return 0 # not a loopback proxy: not ours to judge
+    any=1
+    if listening "$port"; then alive=1; fi
+  done
+  unset IFS
+  [ -n "$any" ] || return 0
+  [ -z "$alive" ] || return 0
+
+  if [ -n "$check" ]; then
+    echo "dead: $label -> $backends"
+    found=1
+    return 0
+  fi
+
+  local since
+  since="$(awk -v k="$key" '$1 == k { print $2 }' "$state_file")"
+  since="${since:-$now}"
+  if [ $((now - since)) -lt "$grace" ]; then
+    echo "$key $since" >>"$next_state"
+    say "waiting: $label -> $backends (down $((now - since))s of ${grace}s)"
+    return 0
+  fi
+
+  if [ -n "$dry_run" ]; then
+    echo "would remove: $label -> $backends"
+    echo "$key $since" >>"$next_state"
+  elif eval "$off" >/dev/null 2>&1; then
+    echo "removed: $label -> $backends"
+  else
+    echo "failed to remove: $label" >&2
+    echo "$key $since" >>"$next_state"
+  fi
+}
+
+found=""
+status_json="$(tailscale serve status --json 2>/dev/null || echo '{}')"
+
+# Persisted routes: web routes backed only by proxies, and raw TCP forwards.
+while read -r kind port backends; do
+  case "$port" in ''|*[!0-9]*) continue ;; esac
+  if printf '%s\n' "$kept_ports" | grep -qx "$port"; then continue; fi
+  case " $portless_ports " in *" $port "*) continue ;; esac
+  if [ "$kind" = "web" ]; then
+    consider "https:$port" "https :$port" "$backends" "tailscale serve --https=$port off"
+  else
+    consider "tcp:$port" "tcp :$port" "$backends" "tailscale serve --tcp=$port off"
+  fi
+done < <(printf '%s' "$status_json" | jq -r '
+  (.Web // {} | to_entries[]
+    | [.value.Handlers[]?] as $h
+    | select(($h | length) > 0 and ($h | all(has("Proxy"))))
+    | "web \(.key | split(":") | last) \($h | map(.Proxy) | join(","))"),
+  (.TCP // {} | to_entries[] | select(.value.TCPForward)
+    | "tcp \(.key) \(.value.TCPForward)")')
+
+# Foreground serve sessions orphaned to init (an `expose` killed with SIGKILL).
+# shellcheck disable=SC2009 # pgrep cannot report the parent pid
+while read -r pid ppid cmd; do
+  [ "$ppid" = "1" ] || continue
+  target="${cmd##* }"
+  consider "fg:$pid" "foreground serve (pid $pid)" "$target" "kill $pid"
+done < <(ps -eo pid=,ppid=,args= | grep -E '[s]erve --yes --(https|tcp)=[0-9]+ ' || true)
+
+[ -n "$check" ] || mv "$next_state" "$state_file"
+if [ -n "$check" ] && [ -n "$found" ]; then exit 1; fi
+exit 0

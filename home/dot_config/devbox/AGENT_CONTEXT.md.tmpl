@@ -29,8 +29,7 @@
 - Local services must remain private to the host or tailnet.
 - Prefer loopback bindings such as `127.0.0.1:3000` and Docker mappings such as `127.0.0.1:5432:5432`.
 - Use the `devbox-network` skill when a service must be reachable from a client device.
-- Run compatible HTTP development servers through Portless; its Tailscale registration must share the child process lifecycle.
-- Use direct Tailscale Serve only for raw TCP services and incompatible HTTP servers, with a project-scoped teardown for the exact route.
+- Every tailnet route is a lease that ends with its process: `dev` (Portless) for HTTP development servers, `expose` for raw TCP and incompatible HTTP servers. `devbox-serve-gc` withdraws leaked routes.
 - Never use Tailscale Funnel or another public tunnel unless explicitly requested.
 
 ## Trust boundary

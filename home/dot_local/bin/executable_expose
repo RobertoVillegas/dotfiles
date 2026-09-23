@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# Share a loopback service on the tailnet for exactly as long as it runs.
+#
+#   expose 5432                      share an already-running service until Ctrl+C
+#   expose 3000 -- bun run dev       run the command and share its port
+#   expose --tcp 5432 -- postgres    raw TCP instead of HTTPS
+#
+# The route is a *foreground* Tailscale Serve session, never `--bg`: tailscaled
+# ties it to this CLI's connection and withdraws it when that connection closes,
+# even if everything here is killed with SIGKILL. A `--bg` route is persisted
+# config that outlives its owner until someone runs `tailscale serve off`.
+#
+# Use Portless (`dev`) for HTTP dev servers it supports; this is for raw TCP and
+# servers Portless cannot front. Tailnet only: it never enables Funnel.
+set -euo pipefail
+
+usage() {
+  sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+  exit "${1:-0}"
+}
+
+mode="https"
+public_port=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tcp) mode="tcp"; shift ;;
+    --port) public_port="${2:?--port needs a value}"; shift 2 ;;
+    -h|--help) usage 0 ;;
+    --) break ;;
+    -*) echo "expose: unknown option $1" >&2; usage 2 >&2 ;;
+    *) break ;;
+  esac
+done
+
+local_port="${1:-}"
+case "$local_port" in
+  ''|*[!0-9]*) echo "expose: a numeric local port is required" >&2; usage 2 >&2 ;;
+esac
+shift
+if [ "${1:-}" = "--" ]; then shift; fi
+
+command -v tailscale >/dev/null 2>&1 || { echo "expose: tailscale CLI not found" >&2; exit 127; }
+command -v jq >/dev/null 2>&1 || { echo "expose: jq not found" >&2; exit 127; }
+
+# Every tailnet port already claimed, persisted or foreground. Portless reads
+# only persisted config, so exposures start at 9443 to stay clear of the
+# 443/8443/8444... sequence it allocates from.
+used_ports() {
+  tailscale serve status --json 2>/dev/null | jq -r '
+    [., (.Foreground // {} | .[])]
+    | map((.TCP // {} | keys[]), (.Web // {} | keys[] | split(":") | last))
+    | .[]' 2>/dev/null | sort -un
+}
+
+if [ -z "$public_port" ]; then
+  used="$(used_ports)"
+  public_port="${EXPOSE_PORT_START:-9443}"
+  while printf '%s\n' "$used" | grep -qx "$public_port"; do
+    public_port=$((public_port + 1))
+  done
+fi
+
+child_pid=""
+serve_pid=""
+
+# shellcheck disable=SC2329 # invoked through the traps below
+stop() {
+  trap - EXIT INT TERM HUP
+  for pid in $serve_pid $child_pid; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  # Give the dev server a moment to shut down cleanly before forcing it.
+  for _ in 1 2 3 4 5; do
+    alive=""
+    for pid in $serve_pid $child_pid; do
+      if kill -0 "$pid" 2>/dev/null; then alive=1; fi
+    done
+    [ -z "$alive" ] && break
+    sleep 1
+  done
+  for pid in $serve_pid $child_pid; do
+    kill -KILL "$pid" 2>/dev/null || true
+  done
+  # Reap them so bash does not report the kills as job notifications.
+  wait 2>/dev/null || true
+}
+trap 'stop; exit 130' INT
+trap 'stop; exit 143' TERM HUP
+trap stop EXIT
+
+if [ $# -gt 0 ]; then
+  "$@" &
+  child_pid=$!
+fi
+
+if [ "$mode" = "tcp" ]; then
+  tailscale serve --yes --tcp="$public_port" "tcp://127.0.0.1:$local_port" >/dev/null &
+else
+  tailscale serve --yes --https="$public_port" "http://127.0.0.1:$local_port" >/dev/null &
+fi
+serve_pid=$!
+
+host="$(tailscale status --json 2>/dev/null | jq -r '.Self.DNSName // empty' | sed 's/\.$//')"
+if [ "$mode" = "tcp" ]; then
+  echo "expose: tcp://${host:-<tailnet host>}:$public_port -> 127.0.0.1:$local_port" >&2
+else
+  echo "expose: https://${host:-<tailnet host>}:$public_port -> http://127.0.0.1:$local_port" >&2
+fi
+echo "expose: the route disappears when this process stops" >&2
+
+# Supervise both: whichever stops first takes the other with it, so a route
+# never outlives its service and a service never runs unshared by surprise.
+status=0
+while :; do
+  if ! kill -0 "$serve_pid" 2>/dev/null; then
+    wait "$serve_pid" 2>/dev/null || status=$?
+    echo "expose: tailscale serve stopped (status $status)" >&2
+    [ "$status" -eq 0 ] && status=1
+    break
+  fi
+  if [ -n "$child_pid" ] && ! kill -0 "$child_pid" 2>/dev/null; then
+    wait "$child_pid" 2>/dev/null || status=$?
+    echo "expose: command exited (status $status)" >&2
+    break
+  fi
+  sleep 1
+done
+exit "$status"

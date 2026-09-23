@@ -1,0 +1,25 @@
+#!/bin/sh
+# Private HTTP development sharing on this headless devbox.
+# Usage: dev                    (infer the project's dev script)
+#        dev myapp bun run dev  (explicit name and command)
+#        dev list               (active local and tailnet URLs)
+#        PORTLESS=0 dev         (run without the proxy)
+#
+# Portless publishes each app on the tailnet and withdraws the route when the
+# app exits cleanly. Routes left by sessions that died uncleanly are withdrawn
+# by devbox-serve-gc, which runs here first and on a timer.
+export PORTLESS_TAILSCALE="${PORTLESS_TAILSCALE:-1}"
+export PORTLESS_FUNNEL=0
+export PORTLESS_PORT="${PORTLESS_PORT:-1355}"
+export PORTLESS_HTTPS="${PORTLESS_HTTPS:-0}"
+export PORTLESS_SYNC_HOSTS="${PORTLESS_SYNC_HOSTS:-0}"
+
+if command -v devbox-serve-gc >/dev/null 2>&1; then
+  devbox-serve-gc --quiet || true
+fi
+
+# The mise-managed Portless is the one the proxy service runs, so the CLI and
+# the proxy always share a version.
+portless="${MISE_DATA_DIR:-$HOME/.local/share/mise}/shims/portless"
+[ -x "$portless" ] || portless="portless"
+exec "$portless" "$@"

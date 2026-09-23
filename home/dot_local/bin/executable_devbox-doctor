@@ -146,27 +146,39 @@ elif command -v systemctl >/dev/null 2>&1; then
   fi
 fi
 
+if [ "$(uname -s)" = "Darwin" ]; then
+  if launchctl print "gui/$uid/local.devbox-serve-gc" >/dev/null 2>&1 ||
+    launchctl print "user/$uid/local.devbox-serve-gc" >/dev/null 2>&1; then
+    pass "Leaked-route collector LaunchAgent is loaded"
+  else
+    fail "Leaked-route collector LaunchAgent is not loaded"
+  fi
+elif command -v systemctl >/dev/null 2>&1; then
+  if systemctl --user is-active --quiet devbox-serve-gc.timer; then
+    pass "Leaked-route collector timer is active"
+  else
+    fail "Leaked-route collector timer is inactive"
+  fi
+fi
+
 if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
   pass "Tailscale is owned by the Windows host"
 elif command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; then
   pass "Tailscale is connected"
   serve_status="$(tailscale serve status 2>/dev/null || true)"
   printf '%s\n' "$serve_status"
-  proxy_ports="$(printf '%s\n' "$serve_status" |
-    sed -nE 's#.*proxy http://(127\.0\.0\.1|localhost):([0-9]+).*#\2#p' | sort -u)"
-  while IFS= read -r proxy_port; do
-    [ -n "$proxy_port" ] || continue
-    if [ "$(uname -s)" = "Darwin" ]; then
-      listener_ok="$(lsof -nP -iTCP:"$proxy_port" -sTCP:LISTEN 2>/dev/null || true)"
+  # One definition of a dead route: the collector's, which honours the keep
+  # list and live Portless sessions.
+  if command -v devbox-serve-gc >/dev/null 2>&1; then
+    if dead_routes="$(devbox-serve-gc --check 2>&1)"; then
+      pass "Every Tailscale Serve route has a live backend"
     else
-      listener_ok="$(ss -lnt 2>/dev/null | grep -E "[:.]${proxy_port}[[:space:]]" || true)"
+      warn "Tailscale Serve routes without a live backend (devbox-serve-gc withdraws them)"
+      printf '%s\n' "$dead_routes"
     fi
-    if [ -z "$listener_ok" ]; then
-      warn "Tailscale Serve targets inactive local port $proxy_port"
-    fi
-  done <<EOF
-$proxy_ports
-EOF
+  else
+    warn "devbox-serve-gc is not installed; leaked routes are never withdrawn"
+  fi
 else
   warn "Tailscale is not connected or its CLI needs setup"
 fi
@@ -187,6 +199,7 @@ for instruction_file in \
   "$HOME/.claude/CLAUDE.md" \
   "$HOME/.config/opencode/AGENTS.md" \
   "$HOME/.agents/skills/devbox-network/SKILL.md" \
+  "$HOME/.config/devbox/serve-keep" \
   "$HOME/.agents/skills/agent-browser/SKILL.md" \
   "$HOME/.agents/skills/find-docs/SKILL.md" \
   "$HOME/.agents/skills/find-skills/SKILL.md" \

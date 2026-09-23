@@ -57,6 +57,13 @@ Library/Preferences
 .local/bin/tailscale
 {{ end }}
 
+{{/* Tailnet sharing helpers belong to the devbox that serves the apps. */}}
+{{ if or (ne .profile "dev") (ne .role "devbox") }}
+.local/bin/dev
+.local/bin/devbox-serve-gc
+.local/bin/expose
+{{ end }}
+
 {{ if ne .target "wsl" }}
 .ssh/config
 {{ end }}

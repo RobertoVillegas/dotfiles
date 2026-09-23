@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Re-run whenever a unit or the collector itself changes.
+# launchd: {{ includeTemplate "private_Library/LaunchAgents/local.devbox-serve-gc.plist.tmpl" . | sha256sum }}
+# systemd: {{ include "dot_config/systemd/user/devbox-serve-gc.service" | sha256sum }} {{ include "dot_config/systemd/user/devbox-serve-gc.timer" | sha256sum }}
+# script: {{ include "dot_local/bin/executable_devbox-serve-gc" | sha256sum }}
+
+{{ if and (eq .profile "dev") (eq .role "devbox") -}}
+mkdir -p "$HOME/.local/state/devbox"
+
+{{ if eq .chezmoi.os "darwin" -}}
+uid="$(id -u)"
+label="local.devbox-serve-gc"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+
+for domain in "user/$uid" "gui/$uid"; do
+  launchctl bootout "$domain/$label" 2>/dev/null || true
+done
+
+# Same domain preference as the Portless proxy: gui/ first, user/ when the
+# agent is loaded over SSH with no live GUI session.
+if launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null; then
+  echo "$label bootstrapped into gui/$uid"
+elif launchctl bootstrap "user/$uid" "$plist" 2>/dev/null; then
+  echo "$label bootstrapped into user/$uid"
+else
+  echo "warn: could not load $label; run 'launchctl bootstrap gui/$uid $plist'" >&2
+fi
+{{ else -}}
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user daemon-reload
+  systemctl --user enable --now devbox-serve-gc.timer
+else
+  echo "warn: systemd user timers are unavailable; run 'devbox-serve-gc' periodically" >&2
+fi
+{{ end -}}
+{{ else -}}
+:
+{{ end -}}

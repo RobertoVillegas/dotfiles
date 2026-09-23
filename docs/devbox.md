@@ -179,23 +179,38 @@ git config user.email WORK_EMAIL
 
 ## Services
 
-Run compatible HTTP development servers through Portless. The devbox profile
-starts its loopback-only proxy on port 1355 and enables tailnet sharing for each
-child process:
+Every tailnet route is a lease that ends with its process. Run HTTP development
+servers through `dev`, which starts Portless with tailnet sharing on (its proxy
+listens on loopback port 1355):
 
 ```sh
-portless run --tailscale -- pnpm dev
-portless list
+dev                      # infer the project's dev script
+dev myapp bun run dev    # explicit name and command
+dev list
 ```
 
-Portless removes its Tailscale registration when the child exits. After a hard
-crash, inspect ownership and clean only orphaned routes with `portless prune`.
-For raw TCP services, use a matching Tailscale Serve mapping and teardown:
+For raw TCP or an HTTP server Portless cannot front, `expose` runs the command
+beside a foreground Tailscale Serve session. Tailscale ties that route to the
+CLI's connection and withdraws it when the process stops, even under SIGKILL:
 
 ```sh
-tailscale serve --bg --tcp=5432 tcp://127.0.0.1:5432
-tailscale serve status
-tailscale serve --tcp=5432 off
+expose --tcp 5432 -- postgres -D ./data
+expose 5432              # share a service that is already running, until Ctrl+C
+```
+
+Avoid `tailscale serve --bg` for development: it is persisted config that
+outlives its owner and survives reboots. Portless itself registers `--bg`
+routes and withdraws them only on a clean exit, and it can drop a dead
+session's record before `portless prune` sees it. `devbox-serve-gc` closes that
+gap: every two minutes (LaunchAgent on macOS, systemd timer on Linux) and
+whenever `dev` starts, it withdraws routes whose loopback backend has stayed
+down past a two-minute grace period, and stops orphaned `expose` sessions.
+Services shared on purpose, such as T3 Code at the root, are listed in
+`~/.config/devbox/serve-keep` and never touched.
+
+```sh
+devbox-serve-gc --check  # list dead routes, change nothing
+devbox-serve-gc          # withdraw them now
 ```
 
 Never commit application passwords. Use ignored `.env` files or the project's

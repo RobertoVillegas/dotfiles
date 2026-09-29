@@ -268,7 +268,8 @@ Las versiones y CLIs administradas por mise se declaran en
 `home/dot_config/mise/config.toml.tmpl`. Para agregar una CLI de npm de forma
 reproducible, añade una entrada como `"npm:dev3000" = "0.0.178"`; una instalación
 manual con `npm install -g` pertenece a la versión activa de Node y no pasa a
-formar parte del inventario declarativo.
+formar parte del inventario declarativo. Cada CLI declarada así necesita su
+symlink en `home/dot_agents/bin/`, que la arranca con el node del host.
 
 ### Quién es dueño de qué
 
@@ -281,6 +282,14 @@ y cada máquina termina con una versión distinta.
 
 Nada puede estar en ambos. Los shims de mise van primero en el PATH, así que una
 copia en brew es peso muerto que además deriva.
+
+La excepción son los CLIs de agente, que van antes de los shims. Un shim de
+`npm:` resuelve su node desde el directorio, así que el `.nvmrc` de un proyecto
+alcanza al agente: en un repo fijado a node 20.17.0, `pi` muere en el import de
+`enableCompileCache` (node 22.1 o superior) antes de imprimir una línea.
+`~/.agents/bin` envuelve esos CLIs y los arranca con el node del pin global sin
+tocar el entorno del proyecto, así que una shell abierta por el agente sigue
+viendo el runtime del repo.
 
 ### Seguridad de la cadena de suministro
 

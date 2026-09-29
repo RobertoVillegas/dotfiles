@@ -1,9 +1,23 @@
 export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+
+# Agent CLIs are host tools: a mise shim for an `npm:` package resolves its node
+# from the current directory, so a project pinned to an older runtime takes the
+# agent down with it. ~/.agents/bin wraps those CLIs and starts them on the node
+# of the global pin instead, which means it has to resolve before the shims.
+# brew shellenv, OrbStack, mise activation and this file all reorder PATH, so the
+# function is defined here -- the one file every zsh reads -- and called again by
+# each layer that touches PATH. See home/dot_agents/bin and dot_zshrc.tmpl.
+_agent_path() {
+  [[ -d "$HOME/.agents/bin" ]] || return 0
+  path=("$HOME/.agents/bin" ${path:#"$HOME/.agents/bin"})
+}
+
 {{ if eq .chezmoi.os "darwin" -}}
 export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
 {{ else -}}
 export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
 {{ end -}}
+_agent_path
 {{ if and (eq .target "wsl") (eq .gpu "nvidia") -}}
 [[ -d /usr/lib/wsl/lib ]] && export PATH="/usr/lib/wsl/lib:$PATH"
 {{ end -}}

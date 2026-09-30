@@ -15,4 +15,5 @@ fi
 # Keep mise shims available to non-interactive SSH commands and headless agents.
 export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
 export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:$PATH"
+_agent_path
 typeset -U path PATH

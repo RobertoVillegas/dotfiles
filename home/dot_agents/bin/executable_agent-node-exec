@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Agent CLIs run on the host's node, never on the runtime a project pins.
+#
+# The shims mise generates for `npm:` CLIs exec `#!/usr/bin/env node`, and mise
+# resolves that node from the current directory, so a project's `.nvmrc`,
+# `.node-version` or `mise.toml` reaches into the agent. Inside a repo pinned to
+# node 20.17.0, `pi` dies on `import { enableCompileCache } from "node:module"`
+# (node >= 22.1) before it prints a single line.
+#
+# Agent CLIs are host tools, not project dependencies, so this wrapper starts the
+# CLI on the node declared in the global mise config. Everything else is left
+# alone: a shell opened by the agent still sees the runtime the repository pins.
+#
+# One symlink per CLI lives next to this script, and dot_zshenv.tmpl puts
+# ~/.agents/bin ahead of the mise shims.
+set -euo pipefail
+
+bin="${0##*/}"
+shims="${MISE_DATA_DIR:-$HOME/.local/share/mise}/shims"
+shim="$shims/$bin"
+
+fallback() {
+  if [[ -x "$shim" ]]; then
+    exec "$shim" "$@"
+  fi
+  printf '%s: no mise shim for this command\n' "$bin" >&2
+  exit 127
+}
+
+# A wrapper never installs anything: answer from what is already on disk. The
+# "/" keeps the project's mise.toml, .nvmrc and .node-version out of the answer.
+node_dir="$(cd / && MISE_NOT_FOUND_AUTO_INSTALL=0 mise where node 2>/dev/null)/bin" || node_dir=""
+if [[ ! -x "$node_dir/node" ]]; then
+  printf '%s: no node in the global mise config; falling back to the shim\n' "$bin" >&2
+  fallback "$@"
+fi
+
+entry="$(MISE_NOT_FOUND_AUTO_INSTALL=0 mise which "$bin" 2>/dev/null)" || entry=""
+if [[ -z "$entry" || ! -e "$entry" ]]; then
+  fallback "$@"
+fi
+
+# Compiled CLIs (Bun, Go) carry no shebang and need nothing from us.
+magic="$(head -c 2 "$entry" 2>/dev/null || true)"
+if [[ "$magic" != "#!" ]]; then
+  fallback "$@"
+fi
+
+shebang="$(head -n 1 "$entry" 2>/dev/null || true)"
+case "$shebang" in
+  *node*) exec "$node_dir/node" "$entry" "$@" ;;
+  # A shell wrapper may exec node later on; hand it the host runtime too.
+  *sh*) PATH="$node_dir:$PATH" exec "$entry" "$@" ;;
+  *) fallback "$@" ;;
+esac

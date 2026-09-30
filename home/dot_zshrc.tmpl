@@ -107,3 +107,10 @@ brewm() {
 # Keep activation last so later PATH changes cannot override mise-managed tools.
 command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh)"
 typeset -U path PATH
+
+# Activation rebuilds PATH and leaves the agent CLI wrappers behind the shims,
+# and it does so again on every cd into a project. Put them back in front now and
+# on each prompt, so a project's node pin never reaches an agent: see dot_agents.
+_agent_path
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _agent_path

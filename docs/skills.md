@@ -8,7 +8,18 @@ otherwise change executable agent instructions without review.
 
 ## Exact upstream skills
 
-`orchestration` is installed without local modifications. Update it on the
+`herdr` and `orchestration` are installed without local modifications. Herdr's
+reviewed copy matches the bundled `herdr --skill` from version `0.9.3`; keep it
+aligned with the Herdr pin in the mise inventory. Update it from that release,
+review the diff, and import it into chezmoi:
+
+```sh
+herdr --skill > ~/.agents/skills/herdr/SKILL.md
+chezmoi re-add ~/.agents/skills/herdr
+chezmoi diff ~/.agents/skills/herdr
+```
+
+`orchestration` is updated on the
 authoring workstation, then import the reviewed result back into the source
 state:
 

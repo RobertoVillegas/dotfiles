@@ -254,6 +254,43 @@ Claude Code receives symlinks to the same source files under
 - `agent-browser` and `devbox-network` cover browser automation and leased,
   private service exposure.
 
+Herdr's `run_after_31-install-herdr-integrations.sh.tmpl` installs or refreshes
+the Codex, Pi, Claude Code, and OpenCode integrations when their CLI and config
+directory exist. These are local configuration operations and do not restart
+running agents or Herdr servers. Check the result with `herdr integration status`.
+
+Codex 0.157+ can run hooks and tools through a shared daemon that has another
+pane's environment ([Herdr #4649](https://github.com/herdrdev/herdr/issues/4649)).
+The integration script disables `daemon_auto_start` on versions that expose
+that feature. An existing daemon stays running: launch `codex --no-daemon` from
+inside Herdr to bypass it, or `codex --no-daemon resume <session-id>` to resume
+an available session. An active daemon-owned session may remain locked. Leave
+working sessions running and start a fresh session instead. Installing hooks
+does not retrofit the missing `HERDR_*` environment into an existing session.
+
+## Integrating devbox pull requests
+
+GitHub's Verified badge also accepts each devbox's SSH key. Unattended dotfiles
+updates trust only the authoring workstation's key in
+`~/.config/dotfiles/allowed_signers`, so a devbox-authored PR needs a local merge
+signed by the workstation, as used for PR #4. Review and validate the PR, fetch
+the current main and PR branch, and prepare the integration on an isolated
+branch:
+
+```sh
+git switch -c integrate/reviewed-update origin/main
+git merge --no-ff -S origin/<reviewed-pr-branch>
+git -c gpg.ssh.allowedSignersFile=home/dot_config/dotfiles/allowed_signers \
+  verify-commit HEAD
+```
+
+Publish the reviewed integration with `git push origin HEAD:main` only after
+approval. A normal push rejects concurrent main changes; fetch, reintegrate,
+and sign again rather than force-pushing. A GitHub-generated merge or squash
+commit uses GitHub's signing key and fails the devbox trust check. Every commit
+added after the merge must also leave a workstation-signed tip on main. The
+devboxes can then fetch and apply through `dotfiles-autoupdate`.
+
 `find-docs` calls `npx ctx7@latest` directly and does not install or configure a
 Context7 MCP server. It works without authentication at the public rate limit;
 Context7 login or an API key is optional and remains machine-private.

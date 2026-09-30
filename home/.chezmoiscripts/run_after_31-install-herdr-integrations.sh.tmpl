@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
+
+{{- if eq .profile "dev" }}
+command -v herdr >/dev/null 2>&1 || {
+  echo "Herdr is unavailable; cannot install agent integrations." >&2
+  exit 1
+}
+
+# Query local integration files, independently of any running Herdr session.
+# Check on every apply so newly installed agents receive their integration too.
+installed="$(herdr integration status)"
+for agent in codex pi claude opencode; do
+  command -v "$agent" >/dev/null 2>&1 || continue
+  case "$agent" in
+    codex) config_dir="${CODEX_HOME:-$HOME/.codex}" ;;
+    pi) config_dir="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}" ;;
+    claude) config_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}" ;;
+    opencode) config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode" ;;
+  esac
+  # Herdr requires the agent's config directory to exist already.
+  [ -d "$config_dir" ] || continue
+  if ! grep -q "^$agent: current " <<<"$installed"; then
+    herdr integration install "$agent"
+  fi
+done
+
+# Codex 0.157+ shares a daemon whose launch environment can belong to another
+# pane. Disable automatic startup only on versions that expose this feature.
+# Existing daemons stay running; use --no-daemon to bypass them when launching.
+# https://github.com/herdrdev/herdr/issues/4649
+if command -v codex >/dev/null 2>&1 &&
+  [ -d "${CODEX_HOME:-$HOME/.codex}" ] &&
+  features="$(codex features list 2>/dev/null)" &&
+  grep -q '^daemon_auto_start[[:space:]]' <<<"$features"; then
+  if awk '$1 == "daemon_auto_start" && $NF == "true" { found = 1 } END { exit !found }' <<<"$features"; then
+    codex features disable daemon_auto_start
+  fi
+fi
+{{- end }}

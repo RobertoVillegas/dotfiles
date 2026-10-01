@@ -23,7 +23,6 @@ fi
 # unmanaged: they are machine data, not configuration.
 packages=(
   npm:pi-web-access
-  npm:pi-mcp-adapter
   npm:pi-subagents
   npm:@narumitw/pi-goal
   npm:pi-fabric
@@ -36,7 +35,12 @@ packages=(
 
 # Known predecessors are removed deliberately. Pi credentials, sessions and
 # provider configuration remain untouched.
+#
+# pi-mcp-adapter: Pi 0.99 ships MCP built in (~/.pi/agent/mcp.json, /mcp,
+# `pi mcp add`). An extension that registers /mcp replaces the built-in support,
+# so keeping the adapter would leave Pi ignoring its own mcp.json.
 obsolete_packages=(
+  npm:pi-mcp-adapter
   npm:pi-claude-bridge
   npm:pi-cursor-oauth
   npm:@tian.zuo/pi-antigravity
@@ -76,6 +80,8 @@ fi
 
 # Conservative defaults for the Antigravity bridge. The config remains
 # machine-local and user-editable after creation; chezmoi never overwrites it.
+# bridgeTools "mcp" still matches only pi-mcp-adapter tools (bridge 1.7.8), so
+# with Pi's built-in MCP it bridges skills alone -- the narrow surface we want.
 antigravity_config="$HOME/.pi/agent/antigravity-bridge/config.json"
 if [ ! -e "$antigravity_config" ]; then
   install -d -m 700 "$(dirname "$antigravity_config")"

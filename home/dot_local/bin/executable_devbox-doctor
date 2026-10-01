@@ -83,7 +83,6 @@ pi_settings="$HOME/.pi/agent/settings.json"
 missing_pi_packages=""
 for pi_package in \
   npm:pi-web-access \
-  npm:pi-mcp-adapter \
   npm:pi-subagents \
   npm:@narumitw/pi-goal \
   npm:pi-fabric \

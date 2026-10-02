@@ -81,6 +81,8 @@ fi
 
 pi_settings="$HOME/.pi/agent/settings.json"
 missing_pi_packages=""
+# Names only: the pinned versions live in run_onchange_after_27-install-pi-packages
+# alone, so match settings entries with their @version stripped.
 for pi_package in \
   npm:pi-web-access \
   npm:pi-subagents \
@@ -90,10 +92,12 @@ for pi_package in \
   npm:@trevonistrevon/pi-loop \
   npm:@vanillagreen/pi-claude-bridge \
   npm:pi-cursor-sdk \
-  npm:@estebanforge/pi-antigravity-bridge; do
+  npm:@estebanforge/pi-antigravity-bridge \
+  npm:pi-service-tier; do
   if ! [ -f "$pi_settings" ] ||
     ! jq -e --arg package "$pi_package" \
-      '.packages[]? | select(. == $package)' "$pi_settings" >/dev/null; then
+      '.packages[]? | select(type == "string" and sub("@[^@/]*$"; "") == $package)' \
+      "$pi_settings" >/dev/null; then
     missing_pi_packages="${missing_pi_packages}${missing_pi_packages:+, }$pi_package"
   fi
 done

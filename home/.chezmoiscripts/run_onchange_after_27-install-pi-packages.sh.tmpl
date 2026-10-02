@@ -11,27 +11,30 @@ if ! command -v pi >/dev/null 2>&1; then
   exit 1
 fi
 
-# Our own list, replacing the @robzolkos/lazypi public catalog: that catalog was
-# a third party deciding what each machine gets, and it shipped 22 extensions we
-# never chose. This array is the source of truth for workstations and devboxes.
+# This array is the source of truth for workstations and devboxes.
 #
-# npm sources carry no version on purpose -- `pi install` accepts a ref only for
-# git sources, and pi itself is pinned in dot_config/mise/config.toml.tmpl. Pin a
-# git source as `git:host/owner/repo@<commit>` when one is added here.
+# Every source is pinned. An extension runs with the user's full permissions,
+# and an unpinned source would install whatever its maintainer published last
+# on the next apply, on every machine at once. Pi treats a versioned npm spec as
+# pinned and `pi install` of a new version replaces the old entry, so bumping is
+# an edit here; dotfiles-outdated reports newer releases. Pin a git source as
+# `git:host/owner/repo@<commit>`. Same 24-hour cooldown as mise: do not bump to a
+# release younger than a day (pi-fabric 0.104.0 is a deliberate exception,
+# taken together with pi 1.0.0, which it requires).
 #
 # Credentials, sessions, memory and the ~/.pi/agent/agents drop-ins stay
 # unmanaged: they are machine data, not configuration.
 packages=(
-  npm:pi-web-access
-  npm:pi-subagents
-  npm:@narumitw/pi-goal
-  npm:pi-fabric
-  npm:pi-memory
-  npm:@trevonistrevon/pi-loop
-  npm:@vanillagreen/pi-claude-bridge
-  npm:pi-cursor-sdk
-  npm:@estebanforge/pi-antigravity-bridge
-  npm:pi-service-tier
+  npm:pi-web-access@0.35.0
+  npm:pi-subagents@0.74.0
+  npm:@narumitw/pi-goal@0.54.8
+  npm:pi-fabric@0.104.0
+  npm:pi-memory@0.4.2
+  npm:@trevonistrevon/pi-loop@0.7.15
+  npm:@vanillagreen/pi-claude-bridge@4.0.8
+  npm:pi-cursor-sdk@0.4.0
+  npm:@estebanforge/pi-antigravity-bridge@1.7.8
+  npm:pi-service-tier@0.4.0
 )
 
 # Known predecessors are removed deliberately. Pi credentials, sessions and
@@ -49,11 +52,20 @@ obsolete_packages=(
 
 settings="$HOME/.pi/agent/settings.json"
 
+# Pi identifies an npm package by name, so match a settings entry with or
+# without its @version and remove it by the exact string settings holds.
+installed_entry() {
+  [ -f "$settings" ] || return 0
+  jq -r --arg s "$1" \
+    '.packages[]? | select(type == "string" and sub("@[^@/]*$"; "") == $s)' \
+    "$settings" | head -1
+}
+
 for src in "${obsolete_packages[@]}"; do
-  if [ -f "$settings" ] &&
-    jq -e --arg s "$src" '.packages[]? | select(. == $s)' "$settings" >/dev/null; then
-    echo "Removing obsolete $src..."
-    pi remove "$src"
+  entry="$(installed_entry "$src")"
+  if [ -n "$entry" ]; then
+    echo "Removing obsolete $entry..."
+    pi remove "$entry"
   fi
 done
 
@@ -66,7 +78,8 @@ for src in "${packages[@]}"; do
   pi install "$src"
 done
 
-# `pi install` skips sources already in settings; refresh those explicitly.
+# Pinned sources do not move here; this only reconciles each installation with
+# its declared version, e.g. after ~/.pi/agent/npm was cleared.
 pi update --extensions
 
 # Ask before loading repository-local Pi extensions, prompts, and themes. Keep

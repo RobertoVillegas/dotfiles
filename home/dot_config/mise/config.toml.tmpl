@@ -48,8 +48,9 @@ npm.shell_out = true
 # the resolved download URLs, which keeps installs off the GitHub API.
 lockfile = true
 lockfile_platforms = ["macos-arm64", "linux-x64"]
-# Refuse versions published in the last day. A poisoned release is usually
-# yanked within hours, so a single day closes most of the window at a fraction
-# of the staleness a week costs. The docs claim this is already the default but
-# `mise settings get` reports it unset, so it is spelled out rather than assumed.
-minimum_release_age = "24h"
+# Refuse versions published in the last 4 hours. A poisoned release is usually
+# yanked within hours; 4 hours covers the fastest takedowns while letting dev
+# tooling pick up a fresh release the same day, which 24 hours kept blocking.
+# Spelled out rather than left to mise's default, which `mise settings get`
+# reports unset.
+minimum_release_age = "4h"

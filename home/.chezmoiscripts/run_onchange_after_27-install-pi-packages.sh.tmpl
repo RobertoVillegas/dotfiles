@@ -18,9 +18,8 @@ fi
 # on the next apply, on every machine at once. Pi treats a versioned npm spec as
 # pinned and `pi install` of a new version replaces the old entry, so bumping is
 # an edit here; dotfiles-outdated reports newer releases. Pin a git source as
-# `git:host/owner/repo@<commit>`. Same 24-hour cooldown as mise: do not bump to a
-# release younger than a day (pi-fabric 0.104.0 is a deliberate exception,
-# taken together with pi 1.0.0, which it requires).
+# `git:host/owner/repo@<commit>`. Same 4-hour cooldown as mise: do not bump to a
+# release younger than that.
 #
 # Credentials, sessions, memory and the ~/.pi/agent/agents drop-ins stay
 # unmanaged: they are machine data, not configuration.

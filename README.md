@@ -317,16 +317,17 @@ robada sería ejecución de código en las dos devbox. Cuatro capas:
    binario, así que sólo su propio script queda en `allow_builds`; no se concede
    una excepción global ni a sus dependencias.
 
-4. **Cuarentena de 24 horas.** Un paquete envenenado casi siempre se retira en
+4. **Cuarentena de 4 horas.** Un paquete envenenado casi siempre se retira en
    horas, así que el riesgo no es quedarse atrás: es instalar justo dentro de esa
-   ventana. Un día la cierra casi por completo sin costar frescura.
+   ventana. 4 horas cubren los retiros más rápidos sin bloquear un release
+   reciente que se necesita en desarrollo, que es lo que pasaba con 24.
 
    | Capa | Ajuste | Dónde |
    | --- | --- | --- |
-   | mise (toolchain) | `minimum_release_age = "24h"` | `dot_config/mise/config.toml.tmpl` |
-   | pnpm (deps de proyectos) | `minimumReleaseAge: 1440` (min) | `dot_config/pnpm/config.yaml` (Linux) |
+   | mise (toolchain) | `minimum_release_age = "4h"` | `dot_config/mise/config.toml.tmpl` |
+   | pnpm (deps de proyectos) | `minimumReleaseAge: 240` (min) | `dot_config/pnpm/config.yaml` (Linux) |
    | | | `private_Library/Preferences/pnpm/config.yaml` (macOS) |
-   | bun (deps de proyectos) | `minimumReleaseAge = 86400` (seg) | `dot_bunfig.toml` |
+   | bun (deps de proyectos) | `minimumReleaseAge = 14400` (seg) | `dot_bunfig.toml` |
 
    pnpm guarda registry y auth en INI y todo lo demás en YAML, así que la llave
    en `~/.npmrc` se ignora en silencio y npm además advierte por ella. npm no

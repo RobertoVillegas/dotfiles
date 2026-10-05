@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Withdraw tailnet routes whose service is gone.
 #
-#   devbox-serve-gc              remove routes dead for longer than the grace period
+#   devbox-serve-gc              remove routes dead for longer than the grace period,
+#                                then end dev servers whose Portless session died
 #   devbox-serve-gc --dry-run    report what would be removed, change nothing
 #   devbox-serve-gc --check      list dead routes now (ignoring grace); exit 1 if any
-#   devbox-serve-gc --grace 300  seconds a backend must stay down first (default 120)
+#   devbox-serve-gc --audit      list live routes nobody owns and leases older than
+#                                24 hours; exit 1 if any. Reports only, never stops
+#   devbox-serve-gc --grace 300  seconds a backend must stay down first (default 60)
 #
 # Portless registers `tailscale serve --bg` routes, which are persisted config:
 # when its session dies without a clean exit (SIGKILL, crash, a closed pane) the
@@ -17,22 +20,35 @@
 # - A foreground `tailscale serve` (an `expose` session) orphaned to init whose
 #   backend is gone is stopped, which withdraws its route.
 #
+# - After that, `portless prune` ends dev servers whose Portless session died
+#   while they kept listening, and drops their stale Portless entries, so the
+#   whole lease goes: route, registry entry, and process.
+#
 # Never touched: routes owned by a live Portless session, non-loopback or
 # file-serving routes, and ports listed in ~/.config/devbox/serve-keep (one per
 # line; `#` starts a comment) for services that are shared on purpose.
+#
+# --audit covers what is alive but should not be: a route with a live backend
+# that no Portless session, `expose` session or keep entry owns (a hand-made
+# `tailscale serve --bg`), and leases running for more than a day, usually a
+# dev server an agent started in the background and never stopped.
 set -euo pipefail
 
-grace=120
+grace=60
 dry_run=""
 check=""
+audit=""
 quiet=""
+# A lease older than this is reported by --audit.
+max_lease_age=$((24 * 3600))
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) dry_run=1; shift ;;
     --check) check=1; shift ;;
+    --audit) audit=1; shift ;;
     --quiet) quiet=1; shift ;;
     --grace) grace="${2:?--grace needs seconds}"; shift 2 ;;
-    -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "devbox-serve-gc: unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -125,8 +141,70 @@ consider() {
   fi
 }
 
+# Seconds a process has been running, from ps's [[dd-]hh:]mm:ss (macOS has no
+# etimes).
+elapsed_seconds() {
+  local t days=0 h=0 m=0 s=0
+  t="$(ps -o etime= -p "$1" 2>/dev/null | tr -d ' ')" || return 1
+  [ -n "$t" ] || return 1
+  case "$t" in *-*) days="${t%%-*}"; t="${t#*-}" ;; esac
+  IFS=: read -r a b c <<<"$t"
+  if [ -n "$c" ]; then h=$a; m=$b; s=$c; else m=$a; s=$b; fi
+  echo $((10#$days * 86400 + 10#$h * 3600 + 10#$m * 60 + 10#$s))
+}
+
 found=""
 status_json="$(tailscale serve status --json 2>/dev/null || echo '{}')"
+
+if [ -n "$audit" ]; then
+  # Ports held by foreground `expose` sessions: owned while they run.
+  # shellcheck disable=SC2009 # pgrep cannot print the matched argument
+  fg_ports="$(ps -eo args= | grep -oE '[s]erve --yes --(https|tcp)=[0-9]+' | grep -oE '[0-9]+$' || true)"
+  while read -r kind port backends; do
+    case "$port" in ''|*[!0-9]*) continue ;; esac
+    if printf '%s\n' "$kept_ports" | grep -qx "$port"; then continue; fi
+    case " $portless_ports " in *" $port "*) continue ;; esac
+    if printf '%s\n' "$fg_ports" | grep -qx "$port"; then continue; fi
+    alive=""
+    IFS=, read -ra list <<<"$backends"
+    for b in "${list[@]}"; do
+      bp="$(backend_port "$b")" || continue
+      if listening "$bp"; then alive=1; fi
+    done
+    [ -n "$alive" ] || continue # dead routes are --check's and the collector's job
+    echo "unowned: $kind :$port -> $backends (no Portless, expose or serve-keep owner)"
+    found=1
+  done < <(printf '%s' "$status_json" | jq -r '
+    (.Web // {} | to_entries[]
+      | [.value.Handlers[]?] as $h
+      | select(($h | length) > 0 and ($h | all(has("Proxy"))))
+      | "https \(.key | split(":") | last) \($h | map(.Proxy) | join(","))"),
+    (.TCP // {} | to_entries[] | select(.value.TCPForward)
+      | "tcp \(.key) \(.value.TCPForward)")')
+
+  # Leases running for more than a day: Portless sessions and expose sessions.
+  if [ -f "$routes_file" ]; then
+    while read -r pid name; do
+      kill -0 "$pid" 2>/dev/null || continue
+      age="$(elapsed_seconds "$pid")" || continue
+      if [ "$age" -gt "$max_lease_age" ]; then
+        echo "long-lived: $name (pid $pid, $((age / 3600)) h)"
+        found=1
+      fi
+    done < <(jq -r '.[]? | "\(.pid) \(.hostname)"' "$routes_file" 2>/dev/null || true)
+  fi
+  # shellcheck disable=SC2009 # pgrep cannot print the arguments with the pid
+  while read -r pid args; do
+    age="$(elapsed_seconds "$pid")" || continue
+    if [ "$age" -gt "$max_lease_age" ]; then
+      echo "long-lived: expose ${args##*serve } (pid $pid, $((age / 3600)) h)"
+      found=1
+    fi
+  done < <(ps -eo pid=,args= | grep -E '[s]erve --yes --(https|tcp)=[0-9]+ ' || true)
+
+  [ -z "$found" ] || exit 1
+  exit 0
+fi
 
 # Persisted routes: web routes backed only by proxies, and raw TCP forwards.
 while read -r kind port backends; do
@@ -156,4 +234,18 @@ done < <(ps -eo pid=,ppid=,args= | grep -E '[s]erve --yes --(https|tcp)=[0-9]+ '
 
 [ -n "$check" ] || mv "$next_state" "$state_file"
 if [ -n "$check" ] && [ -n "$found" ]; then exit 1; fi
+
+# End the rest of each dead lease: a dev server that outlived its Portless
+# session, and the Portless entry for it.
+if [ -z "$check" ] && [ -z "$dry_run" ]; then
+  portless="${MISE_DATA_DIR:-$HOME/.local/share/mise}/shims/portless"
+  [ -x "$portless" ] || portless="$(command -v portless || true)"
+  if [ -n "$portless" ]; then
+    pruned="$("$portless" prune 2>&1 || true)"
+    case "$pruned" in
+      *"No orphaned"*|"") ;;
+      *) echo "$pruned" ;;
+    esac
+  fi
+fi
 exit 0

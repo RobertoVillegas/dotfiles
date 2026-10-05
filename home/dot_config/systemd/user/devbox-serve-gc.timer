@@ -3,7 +3,7 @@ Description=Run devbox-serve-gc every two minutes
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=2min
+OnUnitActiveSec=1min
 
 [Install]
 WantedBy=timers.target

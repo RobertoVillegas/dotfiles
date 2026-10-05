@@ -1,15 +1,25 @@
 // Several Claude subscriptions for pi-claude-bridge, all through Claude Code.
 //
 // Publishes the bridge's account-router contract so every `pi-claude/*`
-// request runs the unmodified Claude Code binary under one of the configured
-// CLAUDE_CONFIG_DIRs. Switch by hand with /claude-account; a conversation that
-// runs out asks before moving. docs/pi-accounts.md in the dotfiles explains
-// the setup.
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+// request runs the unmodified Claude Code binary under one of your accounts.
+// Accounts are created and logged in from Pi with /claude-account; each one
+// gets a hidden Claude Code config directory. A conversation that runs out
+// asks before moving. docs/pi-accounts.md in the dotfiles explains the setup.
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import { AccountRouter, emptyState, MODES, type Config, type Mode, type State, type SwitchPolicy } from "./router.ts";
+import { dirname, join, resolve, sep } from "node:path";
+import { authStatus, login, logout, type AuthStatus } from "./claude-cli.ts";
+import {
+	AccountRouter,
+	emptyState,
+	MODES,
+	type Config,
+	type Mode,
+	type ProfileConfig,
+	type State,
+	type SwitchPolicy,
+} from "./router.ts";
 
 const ROUTER_SYMBOL = Symbol.for("kendex.pi.claude-account-router.v1");
 const ACCOUNT_HOST_SYMBOL = Symbol.for("kendex.pi.claude-bridge.account-host.v1");
@@ -24,6 +34,8 @@ const PARENT_SESSION_ENV = "PI_SUBAGENT_PARENT_SESSION";
 // process it starts, for children launched without a parent session id.
 const PROFILE_ENV = "PI_CLAUDE_ACCOUNTS_PROFILE";
 const USAGE_STALE_MS = 30 * 60_000;
+/** The account every machine starts with: the existing Claude Code login. */
+const DEFAULT_ACCOUNT: ProfileConfig = { id: "personal", label: "Personal" };
 
 const agentDir = () => {
 	const dir = process.env.PI_CODING_AGENT_DIR?.trim();
@@ -31,26 +43,42 @@ const agentDir = () => {
 };
 const configPath = () => join(agentDir(), "claude-accounts.json");
 const statePath = () => join(agentDir(), "claude-accounts-state.json");
+/** Hidden Claude Code config directories, one per account added from Pi. */
+const accountsDir = () => join(agentDir(), "claude-accounts");
 
 function expandHome(path: string): string {
 	return path === "~" || path.startsWith("~/") ? join(homedir(), path.slice(1)) : path;
 }
 
-function loadConfig(): Config | undefined {
-	if (!existsSync(configPath())) return undefined;
-	const raw = JSON.parse(readFileSync(configPath(), "utf8")) as Partial<Config>;
+const isInside = (path: string, dir: string) => resolve(path).startsWith(resolve(dir) + sep);
+
+/** Settings from the dotfiles; defaults when the file is missing. */
+function loadConfig(): Config {
+	let raw: Partial<Config> = {};
+	try {
+		raw = JSON.parse(readFileSync(configPath(), "utf8")) as Partial<Config>;
+	} catch {}
 	const mode: Mode = MODES.includes(raw.mode as Mode) ? (raw.mode as Mode) : "failover";
 	// Anything but an explicit "auto" asks before moving a conversation.
 	const switchConversations: SwitchPolicy = raw.switchConversations === "auto" ? "auto" : "ask";
-	const profiles = (raw.profiles ?? [])
-		.filter((p) => p && typeof p.id === "string" && p.id.trim())
-		.map((p) => {
-			const configDir = p.configDir ? expandHome(p.configDir) : undefined;
-			// ~/.claude is the bridge's own default; pass it as "no override".
-			const isDefault = configDir === join(homedir(), ".claude");
-			return { id: p.id, label: p.label, ...(configDir && !isDefault ? { configDir } : {}) };
-		});
-	return profiles.length > 0 ? { mode, switchConversations, profiles } : undefined;
+	return { mode, switchConversations };
+}
+
+/** Accounts declared in claude-accounts.json by an earlier version, imported
+ *  once into the local state. */
+function legacyAccounts(): ProfileConfig[] {
+	try {
+		const raw = JSON.parse(readFileSync(configPath(), "utf8")) as { profiles?: ProfileConfig[] };
+		return (raw.profiles ?? [])
+			.filter((p) => p && typeof p.id === "string" && p.id.trim())
+			.map((p) => {
+				const configDir = p.configDir ? expandHome(p.configDir) : undefined;
+				const isDefault = !configDir || configDir === join(homedir(), ".claude");
+				return isDefault ? { id: p.id, label: p.label } : { id: p.id, label: p.label, configDir, loggedIn: false };
+			});
+	} catch {
+		return [];
+	}
 }
 
 /** State shared by every Pi process on this machine through one file, so a
@@ -59,8 +87,10 @@ function loadConfig(): Config | undefined {
  *  cannot drop each other's cooldowns or conversation accounts. */
 class StateFile {
 	private mtimeMs = 0;
+	private readonly path: string;
 	private readonly lock: string;
-	constructor(private readonly path: string) {
+	constructor(path: string) {
+		this.path = path;
 		this.lock = `${path}.lock`;
 	}
 
@@ -68,7 +98,7 @@ class StateFile {
 		try {
 			this.mtimeMs = statSync(this.path).mtimeMs;
 			const saved = JSON.parse(readFileSync(this.path, "utf8")) as Partial<State>;
-			return { ...emptyState(), ...saved, sessions: saved.sessions ?? {} };
+			return { ...emptyState(), ...saved, accounts: saved.accounts ?? [], sessions: saved.sessions ?? {} };
 		} catch {
 			return emptyState();
 		}
@@ -137,24 +167,31 @@ const configMtime = () => {
 	}
 };
 
-/** Reloads the config only when its file changes, so /claude-account mode
- *  and switch hold for the rest of the process. */
-function instance(): Instance | undefined {
+/** One router per process. Reloads the settings only when their file
+ *  changes, so /claude-account mode and switch hold for the process. */
+function instance(): Instance {
 	const host = globalThis as Record<symbol, unknown>;
 	const existing = host[INSTANCE_SYMBOL] as Instance | undefined;
 	const mtime = configMtime();
-	if (existing && existing.configMtimeMs === mtime) return existing;
-	const config = loadConfig();
-	if (!config) return existing;
 	if (existing) {
-		existing.router.config = config;
-		existing.configMtimeMs = mtime;
+		if (existing.configMtimeMs !== mtime) {
+			existing.router.config = loadConfig();
+			existing.configMtimeMs = mtime;
+		}
 		return existing;
 	}
 	const file = new StateFile(statePath());
-	const router = new AccountRouter(config, file.read(), Date.now, (state) => file.write(state));
+	const router = new AccountRouter(loadConfig(), file.read(), Date.now, (state) => file.write(state));
 	const created: Instance = { router, file, configMtimeMs: mtime, failedTurns: new Set() };
 	host[INSTANCE_SYMBOL] = created;
+	// First run on this machine: import an earlier account list, or start with
+	// the existing Claude Code login.
+	transact(created, () => {
+		if (router.state.accounts.length > 0) return;
+		const legacy = legacyAccounts();
+		router.state.accounts = legacy.length > 0 ? legacy : [{ ...DEFAULT_ACCOUNT }];
+		file.write(router.state);
+	});
 	return created;
 }
 
@@ -223,58 +260,80 @@ interface AccountHost {
 	}>;
 }
 
-/** Reads identity and 5-hour/7-day usage for every account through the
- *  bridge's local /usage probe, which sends no model request. */
+/** Reads identity and 5-hour/7-day usage for every logged-in account through
+ *  the bridge's local /usage probe, which sends no model request. */
 async function refreshUsage(inst: Instance, cwd: string): Promise<number> {
 	const host = (globalThis as Record<symbol, unknown>)[ACCOUNT_HOST_SYMBOL] as AccountHost | undefined;
 	if (host?.version !== 1) return 0;
 	const results = await Promise.allSettled(
-		inst.router.config.profiles.map(async (p) => {
-			const before = inst.router.state.usage[p.id]?.at;
-			const result = await host.probeProfile({ profile: inst.router.route(p.id), cwd });
-			return transact(inst, () => {
-				if (result.identity?.email) inst.router.recordIdentity(p.id, result.identity);
-				if (result.usage) inst.router.recordUsage(p.id, result.usage);
-				// Counts only accounts that returned plan limits; one that is not
-				// logged in answers without them.
-				return inst.router.state.usage[p.id]?.at !== before ? 1 : 0;
-			});
-		}),
+		inst.router.state.accounts
+			.filter((p) => p.loggedIn !== false)
+			.map(async (p) => {
+				const before = inst.router.state.usage[p.id]?.at;
+				const result = await host.probeProfile({ profile: inst.router.route(p.id), cwd });
+				return transact(inst, () => {
+					if (result.identity?.email) inst.router.recordIdentity(p.id, result.identity);
+					if (result.usage) inst.router.recordUsage(p.id, result.usage);
+					return inst.router.state.usage[p.id]?.at !== before ? 1 : 0;
+				});
+			}),
 	);
 	return results.reduce((n, r) => n + (r.status === "fulfilled" ? r.value : 0), 0);
 }
 
-function describe(router: AccountRouter, modelId: string, sessionId?: string): string {
+/** Asks Claude Code whether each account is logged in, and records it. */
+async function checkLogins(inst: Instance): Promise<Map<string, AuthStatus | undefined>> {
+	const accounts = [...inst.router.state.accounts];
+	const statuses = await Promise.all(accounts.map((p) => authStatus(p.configDir)));
+	const result = new Map<string, AuthStatus | undefined>();
+	transact(inst, () => {
+		accounts.forEach((p, i) => {
+			const status = statuses[i];
+			result.set(p.id, status);
+			if (!status || !inst.router.profile(p.id)) return;
+			inst.router.setLoggedIn(p.id, status.loggedIn);
+			if (status.loggedIn && status.email) inst.router.recordIdentity(p.id, status);
+		});
+	});
+	return result;
+}
+
+function describe(router: AccountRouter, modelId: string, sessionId: string | undefined, logins?: Map<string, AuthStatus | undefined>): string {
 	const active = router.current(modelId, sessionId)?.profileId;
 	const lines = [
-		`Claude accounts · mode ${router.config.mode} · conversations ${router.config.switchConversations === "auto" ? "switch automatically" : "ask before switching"} · model ${modelId}`,
+		`Claude accounts · mode ${router.config.mode} · conversations ${router.config.switchConversations === "auto" ? "switch automatically" : "ask before switching"}`,
 	];
-	for (const p of router.config.profiles) {
+	if (router.state.accounts.length === 0) lines.push("  none yet: /claude-account add <name> [label]");
+	for (const p of router.state.accounts) {
 		const id = router.state.identity[p.id];
 		const usage = router.state.usage[p.id];
 		const pct = (w?: { utilization: number | null }) => (w?.utilization == null ? "?" : `${Math.round(w.utilization)}%`);
 		const blocked = router.blockedUntil(p.id, modelId);
+		const login = logins?.get(p.id);
+		const loggedOut = login ? !login.loggedIn : p.loggedIn === false;
 		const flags = [
-			router.needsLogin(p.id) ? "needs login" : "",
+			loggedOut ? `not logged in → /claude-account login ${p.id}` : "",
+			!loggedOut && router.needsLogin(p.id) ? `login failed → /claude-account login ${p.id}` : "",
 			blocked ? `limited until ${new Date(blocked).toLocaleString()}` : "",
 			router.state.preferred === p.id ? "preferred" : "",
 		].filter(Boolean);
+		const who = loggedOut ? "" : `${id?.email ? ` <${id.email}>` : ""}${id?.subscriptionType ? ` (${id.subscriptionType})` : ""}`;
 		lines.push(
-			`${p.id === active ? "▶" : " "} ${p.id} — ${p.label ?? p.id}` +
-				`${id?.email ? ` <${id.email}>` : ""}${id?.subscriptionType ? ` (${id.subscriptionType})` : ""}` +
-				` · 5h ${pct(usage?.fiveHour)} · 7d ${pct(usage?.sevenDay)}` +
-				`${flags.length ? ` · ${flags.join(", ")}` : ""}` +
-				` · ${p.configDir ?? "~/.claude"}`,
+			`${p.id === active ? "▶" : " "} ${p.id} — ${p.label ?? p.id}${who}` +
+				(loggedOut ? "" : ` · 5h ${pct(usage?.fiveHour)} · 7d ${pct(usage?.sevenDay)}`) +
+				`${flags.length ? ` · ${flags.join(", ")}` : ""}`,
 		);
 	}
-	lines.push("Use: /claude-account use <id> | next | refresh | mode <failover|round-robin|least-used> | switch <ask|auto> | reset");
+	lines.push(
+		"Use: /claude-account use <name> | next | add <name> [label] | login <name> | rename <name> <label> | remove <name> | refresh | mode <failover|round-robin|least-used> | switch <ask|auto> | reset",
+	);
 	return lines.join("\n");
 }
 
-function showStatus(ctx: ExtensionContext, inst: Instance | undefined): void {
+function showStatus(ctx: ExtensionContext, inst: Instance): void {
 	if (!ctx.hasUI) return;
 	const model = ctx.model;
-	if (!inst || model?.provider !== "pi-claude") {
+	if (model?.provider !== "pi-claude") {
 		ctx.ui.setStatus(STATUS_KEY, undefined);
 		return;
 	}
@@ -282,25 +341,57 @@ function showStatus(ctx: ExtensionContext, inst: Instance | undefined): void {
 	ctx.ui.setStatus(STATUS_KEY, route ? `Claude: ${route.label}` : "Claude: no account available");
 }
 
+/** Signs one account in through Claude Code, entirely from Pi. */
+async function signIn(inst: Instance, ctx: ExtensionCommandContext, id: string): Promise<boolean> {
+	const account = inst.router.profile(id);
+	if (!account) throw new Error(`Unknown Claude account "${id}"`);
+	const label = account.label ?? id;
+	if (account.configDir) mkdirSync(account.configDir, { recursive: true, mode: 0o700 });
+	ctx.ui.notify(`Signing in to ${label}: a browser window opens with Anthropic's login.`, "info");
+	const ok = await login(account.configDir, {
+		onLink: (url, finished) => {
+			ctx.ui.notify(`If no browser opened (for example over SSH), open this link, sign in, and paste the code it shows:\n${url}`, "info");
+			return ctx.ui.input(`Sign in to ${label}`, "Paste the code here, or just wait if the browser finished", {
+				signal: finished,
+			});
+		},
+	});
+	const status = await authStatus(account.configDir);
+	const loggedIn = Boolean(ok && status?.loggedIn);
+	transact(inst, () => {
+		inst.router.setLoggedIn(id, loggedIn);
+		if (loggedIn && status?.email) inst.router.recordIdentity(id, status);
+	});
+	ctx.ui.notify(
+		loggedIn
+			? `${label} is ready${status?.email ? `: ${status.email}${status.subscriptionType ? ` (${status.subscriptionType})` : ""}` : ""}.`
+			: `${label} did not log in. Try again with /claude-account login ${id}.`,
+		loggedIn ? "info" : "warning",
+	);
+	return loggedIn;
+}
+
+/** Splits `name rest of the label`, dropping quotes around the label. */
+function nameAndLabel(rest: string): [string, string | undefined] {
+	const [name = "", ...words] = rest.trim().split(/\s+/);
+	const label = words.join(" ").replace(/^["'](.*)["']$/, "$1").trim();
+	return [name, label || undefined];
+}
+
 export default function (pi: ExtensionAPI) {
 	const inst = instance();
-	const conflict = inst ? publish(inst) : undefined;
+	const conflict = publish(inst);
 
 	pi.on("session_start", (_event, ctx) => {
 		const current = instance();
 		if (conflict && ctx.hasUI) ctx.ui.notify(conflict, "warning");
-		if (current) {
-			current.activeSessionId = ctx.sessionManager.getSessionId();
-			const known = current.router.pin(current.activeSessionId)?.profile;
-			if (known && process.env[CHILD_ENV] !== "1") process.env[PROFILE_ENV] = known;
-			// least-used needs figures; fetch them in the background when stale.
-			const stale = current.router.config.profiles.some((p) => {
-				const at = current.router.state.usage[p.id]?.at ?? 0;
-				return Date.now() - at > USAGE_STALE_MS;
-			});
-			if (current.router.config.mode === "least-used" && stale && process.env[CHILD_ENV] !== "1") {
-				void refreshUsage(current, ctx.cwd).catch(() => {});
-			}
+		current.activeSessionId = ctx.sessionManager.getSessionId();
+		const known = current.router.pin(current.activeSessionId)?.profile;
+		if (known && process.env[CHILD_ENV] !== "1") process.env[PROFILE_ENV] = known;
+		// least-used needs figures; fetch them in the background when stale.
+		const stale = current.router.state.accounts.some((p) => Date.now() - (current.router.state.usage[p.id]?.at ?? 0) > USAGE_STALE_MS);
+		if (current.router.config.mode === "least-used" && stale && process.env[CHILD_ENV] !== "1") {
+			void refreshUsage(current, ctx.cwd).catch(() => {});
 		}
 		showStatus(ctx, current);
 	});
@@ -308,7 +399,7 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("agent_end", (event, ctx) => {
 		const current = instance();
-		if (current && ctx.model?.provider === "pi-claude") {
+		if (ctx.model?.provider === "pi-claude") {
 			const last = [...event.messages].reverse().find((m) => (m as { role?: string }).role === "assistant") as
 				| { stopReason?: string; errorMessage?: string }
 				| undefined;
@@ -325,7 +416,7 @@ export default function (pi: ExtensionAPI) {
 	// one in the middle of it (the bridge does not retry those at all).
 	pi.on("agent_settled", async (_event, ctx) => {
 		const current = instance();
-		if (!current || !ctx.hasUI || ctx.model?.provider !== "pi-claude") return;
+		if (!ctx.hasUI || ctx.model?.provider !== "pi-claude") return;
 		const { router } = current;
 		const sessionId = ctx.sessionManager.getSessionId();
 		const failed = current.failedTurns.delete(sessionId);
@@ -347,25 +438,28 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("claude-account", {
-		description: "Show or switch the Claude subscription pi-claude-bridge uses",
+		description: "Add, sign in, show or switch the Claude subscriptions pi-claude-bridge uses",
 		getArgumentCompletions: (prefix) => {
-			const ids = instance()?.router.config.profiles.map((p) => p.id) ?? [];
+			const ids = instance().router.state.accounts.map((p) => p.id);
+			const verbs = ["use", "next", "add", "login", "rename", "remove", "refresh", "mode", "switch", "reset"];
 			const words = [
-				"use", "next", "refresh", "mode", "switch", "reset",
-				...ids.map((id) => `use ${id}`), ...MODES.map((m) => `mode ${m}`), "switch ask", "switch auto",
+				...verbs,
+				...["use", "login", "rename", "remove"].flatMap((verb) => ids.map((id) => `${verb} ${id}`)),
+				...MODES.map((m) => `mode ${m}`),
+				"switch ask",
+				"switch auto",
 			];
 			return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
 		},
 		handler: async (args, ctx) => {
 			const current = instance();
-			if (!current) {
-				ctx.ui.notify(`No Claude accounts configured: create ${configPath()}`, "warning");
-				return;
-			}
 			const { router } = current;
 			const sessionId = ctx.sessionManager.getSessionId();
 			const modelId = ctx.model?.provider === "pi-claude" ? ctx.model.id : "claude-opus";
-			const [verb, value] = args.trim().split(/\s+/);
+			const trimmed = args.trim();
+			const verb = trimmed.split(/\s+/)[0] ?? "";
+			const rest = trimmed.slice(verb.length).trim();
+			const value = rest.split(/\s+/)[0] ?? "";
 			try {
 				if (verb === "use" && value) {
 					const route = transact(current, () => router.use(value, sessionId));
@@ -375,10 +469,37 @@ export default function (pi: ExtensionAPI) {
 					const route = transact(current, () => router.next(modelId, sessionId));
 					process.env[PROFILE_ENV] = route.profileId;
 					ctx.ui.notify(`Next turn uses ${route.label}.`, "info");
+				} else if (verb === "add" && value) {
+					if (!ctx.hasUI) throw new Error("Adding an account needs the interactive sign-in.");
+					const [name, label] = nameAndLabel(rest);
+					transact(current, () => router.addAccount(name, label, join(accountsDir(), name)));
+					await signIn(current, ctx, name);
+				} else if (verb === "login" && value) {
+					if (!ctx.hasUI) throw new Error("Signing in needs the interactive login.");
+					await signIn(current, ctx, value);
+				} else if (verb === "rename" && value) {
+					const [name, label] = nameAndLabel(rest);
+					if (!label) throw new Error("Usage: /claude-account rename <name> <label>");
+					transact(current, () => router.renameAccount(name, label));
+					ctx.ui.notify(`${name} is now shown as "${label}".`, "info");
+				} else if (verb === "remove" && value) {
+					const account = router.profile(value);
+					if (!account) throw new Error(`Unknown Claude account "${value}"`);
+					const label = account.label ?? value;
+					const ownsDir = Boolean(account.configDir && isInside(account.configDir, accountsDir()));
+					const what = account.configDir
+						? `This signs ${label} out of Claude Code${ownsDir ? " and deletes its saved session" : ""}.`
+						: `${label} uses your main Claude Code login (~/.claude); it stays logged in for Claude Code and is only removed from this list.`;
+					if (!(await ctx.ui.confirm(`Remove ${label}?`, what))) return;
+					if (account.configDir) await logout(account.configDir);
+					if (ownsDir) rmSync(account.configDir!, { recursive: true, force: true });
+					transact(current, () => router.removeAccount(value));
+					ctx.ui.notify(`Removed ${label}.`, "info");
 				} else if (verb === "refresh") {
 					ctx.ui.notify("Reading usage for every account…", "info");
 					const n = await refreshUsage(current, ctx.cwd);
-					ctx.ui.notify(`${describe(router, modelId, sessionId)}\n(${n}/${router.config.profiles.length} accounts reported usage)`, "info");
+					const logins = await checkLogins(current);
+					ctx.ui.notify(`${describe(router, modelId, sessionId, logins)}\n(${n} accounts reported usage)`, "info");
 				} else if (verb === "mode" && MODES.includes(value as Mode)) {
 					// For this process; the file in the dotfiles keeps the default.
 					router.config.mode = value as Mode;
@@ -396,7 +517,8 @@ export default function (pi: ExtensionAPI) {
 					ctx.ui.notify("Cleared cooldowns and login flags.", "info");
 				} else {
 					if (current.file.changed()) router.state = current.file.read();
-					ctx.ui.notify(describe(router, modelId, sessionId), "info");
+					const logins = await checkLogins(current);
+					ctx.ui.notify(describe(router, modelId, sessionId, logins), "info");
 				}
 			} catch (error) {
 				ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");

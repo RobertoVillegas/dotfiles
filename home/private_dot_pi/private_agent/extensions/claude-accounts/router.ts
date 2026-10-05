@@ -19,13 +19,20 @@ export interface ProfileConfig {
 	label?: string;
 	/** Claude Code config directory; omitted means the default ~/.claude. */
 	configDir?: string;
+	/** false until a login succeeds; such an account is never routed to. */
+	loggedIn?: boolean;
 }
 
+/** Settings shared through the dotfiles. The accounts themselves are created
+ *  from Pi and live in the machine-local state, because logins are per
+ *  machine anyway. */
 export interface Config {
 	mode: Mode;
 	switchConversations: SwitchPolicy;
-	profiles: ProfileConfig[];
 }
+
+/** Account ids are typed in commands: short, lowercase, no spaces. */
+export const SLUG = /^[a-z0-9][a-z0-9-]{0,31}$/;
 
 export interface Route {
 	profileId: string;
@@ -50,6 +57,8 @@ export interface SessionPin {
 
 /** Shared across Pi processes through the state file; plain JSON only. */
 export interface State {
+	/** The accounts, in the order new conversations try them. */
+	accounts: ProfileConfig[];
 	/** Profile chosen by hand; leads the order for new conversations. */
 	preferred?: string;
 	/** Last profile handed to a new conversation in round-robin mode. */
@@ -66,7 +75,7 @@ export interface State {
 }
 
 export function emptyState(): State {
-	return { cooldowns: {}, needsLogin: {}, identity: {}, usage: {}, sessions: {} };
+	return { accounts: [], cooldowns: {}, needsLogin: {}, identity: {}, usage: {}, sessions: {} };
 }
 
 /** Without reset metadata, how long each failure keeps a profile out. */
@@ -154,7 +163,7 @@ export class AccountRouter {
 	}
 
 	profile(id: string): ProfileConfig | undefined {
-		return this.config.profiles.find((p) => p.id === id);
+		return this.state.accounts.find((p) => p.id === id);
 	}
 
 	label(id: string): string {
@@ -181,7 +190,7 @@ export class AccountRouter {
 	}
 
 	available(id: string, modelId: string): boolean {
-		return this.blockedUntil(id, modelId) === 0 && !this.needsLogin(id);
+		return this.profile(id)?.loggedIn !== false && this.blockedUntil(id, modelId) === 0 && !this.needsLogin(id);
 	}
 
 	pin(sessionId: string): SessionPin | undefined {
@@ -202,7 +211,7 @@ export class AccountRouter {
 
 	/** Profiles in the order a new conversation should try them. */
 	order(): string[] {
-		const ids = this.config.profiles.map((p) => p.id);
+		const ids = this.state.accounts.map((p) => p.id);
 		const preferred = this.state.preferred;
 		if (this.config.mode === "round-robin") {
 			const start = this.state.lastAssigned ? ids.indexOf(this.state.lastAssigned) + 1 : 0;
@@ -222,6 +231,7 @@ export class AccountRouter {
 
 	/** Why the profile cannot serve this model right now. */
 	reason(id: string, modelId: string): string {
+		if (this.profile(id)?.loggedIn === false) return `${this.label(id)} is not logged in`;
 		if (this.needsLogin(id)) return `${this.label(id)} needs to log in again`;
 		const until = this.blockedUntil(id, modelId);
 		return until
@@ -267,7 +277,7 @@ export class AccountRouter {
 		}
 
 		if (!chosen) {
-			const resets = this.config.profiles
+			const resets = this.state.accounts
 				.map((p) => this.blockedUntil(p.id, input.modelId))
 				.filter((t) => t > 0);
 			const resetAtMs = resets.length ? Math.min(...resets) : undefined;
@@ -293,6 +303,9 @@ export class AccountRouter {
 	/** Manual switch: this conversation now, and new conversations by default. */
 	use(id: string, sessionId?: string): Route {
 		const route = this.route(id);
+		if (this.profile(id)?.loggedIn === false) {
+			throw new Error(`${route.label} is not logged in yet: /claude-account login ${id}`);
+		}
 		this.state.preferred = id;
 		// An explicit choice is also a retry: the user may have just logged in.
 		delete this.state.needsLogin[id];
@@ -306,10 +319,14 @@ export class AccountRouter {
 
 	/** The next configured account after the conversation's current one. */
 	next(modelId: string, sessionId?: string): Route {
-		const ids = this.config.profiles.map((p) => p.id);
+		const ids = this.state.accounts.map((p) => p.id);
 		const current = this.current(modelId, sessionId)?.profileId;
 		const start = current ? ids.indexOf(current) : -1;
-		return this.use(ids[(start + 1) % ids.length]!, sessionId);
+		for (let step = 1; step <= ids.length; step++) {
+			const id = ids[(start + step) % ids.length]!;
+			if (this.profile(id)?.loggedIn !== false) return this.use(id, sessionId);
+		}
+		throw new Error("No other account is logged in: /claude-account add <name>");
 	}
 
 	/** A used conversation whose account can no longer serve it, e.g. after a
@@ -353,6 +370,7 @@ export class AccountRouter {
 
 	recordSuccess(id: string, sessionId?: string): void {
 		if (sessionId) this.setPin(sessionId, id, true);
+		this.setLoggedIn(id, true);
 		if (this.state.needsLogin[id]) {
 			delete this.state.needsLogin[id];
 			this.persist(this.state);
@@ -376,6 +394,51 @@ export class AccountRouter {
 	resolveProfile(id: string): { profileId: string; configDir?: string } | undefined {
 		const p = this.profile(id);
 		return p ? { profileId: p.id, ...(p.configDir ? { configDir: p.configDir } : {}) } : undefined;
+	}
+
+	addAccount(id: string, label: string | undefined, configDir: string | undefined): ProfileConfig {
+		if (!SLUG.test(id)) throw new Error(`"${id}" is not a valid account name: use lowercase letters, digits and dashes.`);
+		if (this.profile(id)) throw new Error(`Account "${id}" already exists.`);
+		const account: ProfileConfig = { id, ...(label ? { label } : {}), ...(configDir ? { configDir } : {}), loggedIn: false };
+		this.state.accounts.push(account);
+		this.persist(this.state);
+		return account;
+	}
+
+	renameAccount(id: string, label: string): void {
+		const account = this.profile(id);
+		if (!account) throw new Error(`Unknown Claude account "${id}"`);
+		account.label = label;
+		this.persist(this.state);
+	}
+
+	/** Forgets the account and everything recorded about it. Conversations
+	 *  that used it are routed as new ones afterwards. */
+	removeAccount(id: string): ProfileConfig {
+		const account = this.profile(id);
+		if (!account) throw new Error(`Unknown Claude account "${id}"`);
+		this.state.accounts = this.state.accounts.filter((a) => a.id !== id);
+		for (const key of Object.keys(this.state.cooldowns)) {
+			if (key === id || key.startsWith(`${id}|`)) delete this.state.cooldowns[key];
+		}
+		delete this.state.needsLogin[id];
+		delete this.state.identity[id];
+		delete this.state.usage[id];
+		for (const [session, pin] of Object.entries(this.state.sessions)) {
+			if (pin.profile === id) delete this.state.sessions[session];
+		}
+		if (this.state.preferred === id) delete this.state.preferred;
+		if (this.state.lastAssigned === id) delete this.state.lastAssigned;
+		this.persist(this.state);
+		return account;
+	}
+
+	setLoggedIn(id: string, loggedIn: boolean): void {
+		const account = this.profile(id);
+		if (!account || account.loggedIn === loggedIn || (loggedIn && account.loggedIn === undefined)) return;
+		account.loggedIn = loggedIn;
+		if (loggedIn) delete this.state.needsLogin[id];
+		this.persist(this.state);
 	}
 
 	/** Clear cooldowns and login flags, e.g. after logging in again. */

@@ -87,4 +87,6 @@ Library/Preferences
 .claude_*
 .claude-*
 .pi/agent/claude-accounts-state.json
+.pi/agent/claude-accounts
+.pi/agent/claude-accounts/**
 .t3

@@ -15,16 +15,14 @@ const OPUS = "claude-opus-4-8";
 
 function setup(mode: Mode = "failover", switchConversations: SwitchPolicy = "auto") {
 	let now = Date.parse("2026-10-05T12:00:00Z");
-	const config: Config = {
-		mode,
-		switchConversations,
-		profiles: [
-			{ id: "personal", label: "Personal" },
-			{ id: "work", label: "Work", configDir: "/home/me/.claude-work" },
-		],
-	};
+	const config: Config = { mode, switchConversations };
+	const state = emptyState();
+	state.accounts = [
+		{ id: "personal", label: "Personal" },
+		{ id: "work", label: "Work", configDir: "/home/me/.claude-work" },
+	];
 	const writes: unknown[] = [];
-	const router = new AccountRouter(config, emptyState(), () => now, (s) => writes.push(structuredClone(s)));
+	const router = new AccountRouter(config, state, () => now, (s) => writes.push(structuredClone(s)));
 	return { router, writes, advance: (ms: number) => (now += ms), now: () => now };
 }
 
@@ -252,4 +250,59 @@ test("a limit hit mid-response is offered as a switch afterwards", () => {
 	);
 	router.config.switchConversations = "auto";
 	assert.equal(router.stalled(OPUS, "s1"), undefined);
+});
+
+test("accounts are added from Pi and unused until their login succeeds", () => {
+	const { router } = setup();
+	router.addAccount("games", "Juegos", "/agent/claude-accounts/games");
+	assert.equal(router.label("games"), "Juegos");
+	assert.equal(router.available("games", OPUS), false);
+	assert.throws(() => router.use("games", "s1"), /not logged in yet/);
+	router.setLoggedIn("games", true);
+	assert.equal(router.use("games", "s1").configDir, "/agent/claude-accounts/games");
+});
+
+test("account names are short slugs and unique", () => {
+	const { router } = setup();
+	assert.throws(() => router.addAccount("Mi Cuenta", undefined, undefined), /not a valid account name/);
+	assert.throws(() => router.addAccount("work", undefined, undefined), /already exists/);
+	router.addAccount("dev-2", undefined, "/x");
+	assert.equal(router.label("dev-2"), "dev-2");
+});
+
+test("next skips accounts that are not logged in", () => {
+	const { router } = setup();
+	router.addAccount("fun", undefined, "/x");
+	router.acquire({ modelId: OPUS, sessionId: "s1" });
+	assert.equal(router.next(OPUS, "s1").profileId, "work");
+	assert.equal(router.next(OPUS, "s1").profileId, "personal");
+});
+
+test("rename changes only the label", () => {
+	const { router } = setup();
+	router.renameAccount("work", "Trabajo");
+	assert.equal(router.route("work").label, "Trabajo");
+	assert.equal(router.route("work").profileId, "work");
+});
+
+test("removing an account forgets it everywhere", () => {
+	const { router } = setup();
+	router.use("work", "s1");
+	router.recordSuccess("work", "s1");
+	router.recordRateLimit("work", { rateLimitType: "seven_day_opus" }, OPUS);
+	router.recordIdentity("work", { email: "w@example.com" });
+	router.removeAccount("work");
+	assert.equal(router.profile("work"), undefined);
+	assert.equal(router.state.preferred, undefined);
+	assert.deepEqual(router.state.cooldowns, {});
+	assert.equal(router.state.identity.work, undefined);
+	assert.equal(router.state.sessions.s1, undefined);
+	assert.equal(router.acquire({ modelId: OPUS, sessionId: "s1" }).profileId, "personal");
+});
+
+test("a success marks an account as logged in", () => {
+	const { router } = setup();
+	router.addAccount("fun", undefined, "/x");
+	router.recordSuccess("fun");
+	assert.equal(router.profile("fun")?.loggedIn, true);
 });

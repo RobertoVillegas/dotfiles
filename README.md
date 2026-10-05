@@ -286,6 +286,11 @@ y cada máquina termina con una versión distinta.
 Nada puede estar en ambos. Los shims de mise van primero en el PATH, así que una
 copia en brew es peso muerto que además deriva.
 
+Tampoco un `npm install -g` de algo que mise ya fija: cae en el `bin` del node de
+mise y `mise which` lo encuentra antes que el pin. El botón **Update all** de T3
+instala así. `run_after_21-remove-shadowing-npm-globals` quita esas copias en
+cada apply; sólo toca paquetes que mise declara.
+
 La excepción son los CLIs de agente, que van antes de los shims. Un shim de
 `npm:` resuelve su node desde el directorio, así que el `.nvmrc` de un proyecto
 alcanza al agente: en un repo fijado a node 20.17.0, `pi` muere en el import de

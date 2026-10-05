@@ -68,7 +68,9 @@ T3 publishes a compatibility table per release. For `0.0.46`:
 
 The Settings → Providers **Update all** button installs providers with a global
 `npm install`, outside mise and these pins. Do not use it on machines managed by
-these dotfiles; bump the pin instead.
+these dotfiles; bump the pin instead. If it happens anyway, the next apply removes
+any global npm copy of a package mise pins
+(`run_after_21-remove-shadowing-npm-globals`).
 
 ## What is installed
 

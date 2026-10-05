@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{- if eq .profile "dev" }}
+# One owner per CLI. A global npm install of a package that mise already pins
+# lands in node's own bin directory, and `mise which` resolves that copy first,
+# so the agent wrappers in ~/.agents/bin silently run it instead of the pin.
+# T3's "Update providers" button installs this way. Runs on every apply because
+# that can happen at any time; it only removes packages mise declares.
+
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
+
+command -v mise >/dev/null 2>&1 || exit 0
+command -v npm >/dev/null 2>&1 || exit 0
+
+# From / so a project's mise.toml cannot add or hide tools.
+cd /
+global_modules="$(npm prefix -g)/lib/node_modules"
+[ -d "$global_modules" ] || exit 0
+
+mise ls --current --json |
+  jq -r 'keys[] | select(startswith("npm:")) | sub("^npm:"; "")' |
+  while read -r package; do
+    [ -n "$package" ] || continue
+    if [ -e "$global_modules/$package" ]; then
+      echo "Removing global npm $package; mise owns it."
+      npm rm -g "$package"
+    fi
+  done
+{{- end }}

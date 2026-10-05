@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Owns a few keys of ~/.claude/settings.json and leaves the rest alone: Orca
+# writes its hooks and status line there and Herdr adds its own hook, so
+# replacing the whole file would fight both on every apply.
+#
+# chezmoi passes the current file on stdin and writes back stdout. Without jq
+# (the first apply of a bootstrap runs before the Brewfile), the file passes
+# through unchanged and the next apply sets the keys.
+set -euo pipefail
+
+current="$(cat)"
+[ -n "$current" ] || current='{}'
+
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s' "$current"
+  exit 0
+fi
+
+# attribution: empty strings, not `false`, which Claude Code before 2.1.281
+# rejects together with the rest of the file.
+printf '%s' "$current" | jq '
+  .model = "opus[1m]"
+  | .theme = "auto"
+  | .attribution = { "commit": "", "pr": "", "sessionUrl": false }
+'

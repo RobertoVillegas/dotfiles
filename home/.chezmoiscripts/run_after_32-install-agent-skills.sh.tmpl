@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{- if eq .profile "dev" }}
+# Runs on every apply, not on change: the third-party skills in agents.toml
+# follow upstream, so the daily dotfiles-autoupdate is what brings them forward.
+# dotagents only installs commits older than its minimum_release_age.
+
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$HOME/.agents/bin:$MISE_DATA_DIR/shims:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
+
+skills_dir="$HOME/.agents/skills"
+claude_skills="$HOME/.claude/skills"
+
+if ! command -v dotagents >/dev/null 2>&1; then
+  echo "dotagents is unavailable; install the mise tool inventory first." >&2
+  exit 1
+fi
+
+# Install runs from / so no repository's agents.toml can be mistaken for the
+# global one. A failure here (offline, GitHub down, an untrusted source) leaves
+# the previous skills in place and must not abort the rest of the apply, but it
+# is reported loudly.
+if ! (cd / && dotagents install); then
+  echo "dotagents install failed; third-party skills were left as they were." >&2
+fi
+
+# Claude does not read ~/.agents/skills, so every skill there gets a symlink.
+# Only symlinks are created or removed: a real directory in ~/.claude/skills
+# belongs to Claude (synced/, .trash/) or to the user and is never touched.
+mkdir -p "$claude_skills"
+for skill in "$skills_dir"/*/; do
+  skill="${skill%/}"
+  name="${skill##*/}"
+  [ -f "$skill/SKILL.md" ] || continue
+  link="$claude_skills/$name"
+  if [ -L "$link" ] || [ ! -e "$link" ]; then
+    ln -sfn "$skill" "$link"
+  fi
+done
+
+# Drop links into the shared directory whose skill no longer exists, e.g. after
+# a skill is removed from agents.toml. Links pointing anywhere else are not ours.
+for link in "$claude_skills"/*; do
+  [ -L "$link" ] || continue
+  case "$(readlink "$link")" in
+    "$skills_dir"/*) [ -e "$link" ] || rm "$link" ;;
+  esac
+done
+{{- end }}

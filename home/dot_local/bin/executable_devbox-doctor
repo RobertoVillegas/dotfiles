@@ -60,7 +60,10 @@ if [ "$(uname -s)" = "Linux" ]; then
     fail "T3 Code background service is installed but inactive"
   fi
 elif [ "$(uname -s)" = "Darwin" ]; then
-  if [ -d "/Applications/T3 Code (Alpha).app" ] || [ -d "$HOME/Applications/T3 Code (Alpha).app" ] ||
+  # The Brewfile installs the nightly channel (Orchestrator V2); the other
+  # names cover stable installs.
+  if [ -d "/Applications/T3 Code (Nightly).app" ] || [ -d "$HOME/Applications/T3 Code (Nightly).app" ] ||
+    [ -d "/Applications/T3 Code (Alpha).app" ] || [ -d "$HOME/Applications/T3 Code (Alpha).app" ] ||
     [ -d "/Applications/T3 Code.app" ] || [ -d "$HOME/Applications/T3 Code.app" ]; then
     pass "T3 Code desktop/server app is installed"
   else

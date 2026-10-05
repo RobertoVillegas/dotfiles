@@ -334,10 +334,10 @@ Each harness owns its authentication; T3 does not unify it.
 
   Those directories hold credentials and stay outside chezmoi. A thread can only
   switch between instances that share a config directory.
-- **Pi:** Claude goes through `pi-claude-bridge`, which uses the Claude Code
-  login. `pi-multi-account` rotates Codex, Cursor and other subscription slots
-  logged in through Pi's `/login`; T3 sees them as Pi models. Do not log Claude
-  subscriptions into Pi directly; [Pi accounts](pi-accounts.md) explains why.
+- **Pi:** `pi-claude-bridge` uses Claude Code logins through the Agent SDK, and
+  `pi-multi-account` rotates the slots logged in through Pi's `/login`; T3 sees
+  both as Pi models. [Pi accounts](pi-accounts.md) compares the two routes for
+  Claude.
 - **Codex and OpenCode:** their own login on the devbox.
 
 No credential, `auth.json`, or T3 state belongs in these dotfiles. See

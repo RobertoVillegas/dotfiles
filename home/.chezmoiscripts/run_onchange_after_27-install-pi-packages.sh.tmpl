@@ -34,11 +34,11 @@ packages=(
   npm:pi-cursor-sdk@0.4.0
   npm:@estebanforge/pi-antigravity-bridge@1.7.8
   npm:pi-service-tier@0.4.0
-  # Rotates Codex, Cursor and other subscription accounts on quota limits. It
+  # Rotates Claude, Codex and other subscription accounts on quota limits. It
   # reads the slots created with /login from auth.json and writes its own
   # models.json aliases and provider-failover*.json state; none of that is
   # managed here. Children marked PI_SUBAGENT_CHILD by pi-subagents stay passive.
-  # Claude stays on pi-claude-bridge: see docs/pi-accounts.md.
+  # docs/pi-accounts.md compares it with pi-claude-bridge for Claude.
   npm:pi-multi-account@1.24.0
 )
 

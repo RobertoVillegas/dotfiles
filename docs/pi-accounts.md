@@ -1,40 +1,50 @@
 # Pi accounts
 
-Two extensions decide which account a Pi request uses, and they cover different
-providers.
+Two extensions decide which account a Pi request uses.
 
 | Provider in Pi | Extension | Accounts |
 | --- | --- | --- |
-| `pi-claude/*` (Claude) | `@vanillagreen/pi-claude-bridge` | the Claude Code login on the machine |
-| `openai-codex*`, `cursor*`, `kimi*`, `qwen*`, `ollama*` | `pi-multi-account` | every slot logged in with Pi's `/login` |
+| `pi-claude/*` (Claude via the Agent SDK) | `@vanillagreen/pi-claude-bridge` | Claude Code logins |
+| `anthropic*`, `openai-codex*`, `cursor*`, `kimi*`, `qwen*`, `ollama*` | `pi-multi-account` | every slot logged in with Pi's `/login` |
 
-## Claude goes through the bridge
+## Several Claude subscription accounts in Pi
 
-Use Claude in Pi only through `pi-claude-bridge`. It runs the unmodified
-Claude Code binary through the Claude Agent SDK, so the subscription is used by
-Claude Code itself, signed in through Anthropic's own flow.
+There are two routes, and they differ in who talks to Anthropic:
 
-Do not log in Anthropic subscription accounts with Pi's `/login`, and do not use
-`pi-multi-account`'s `anthropic-account-*` slots. That path sends requests from
-Pi itself with the subscription's OAuth token. Anthropic's
-[legal and compliance terms](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
-reserve OAuth for Claude Code and Anthropic's own apps and say Anthropic may
-enforce that without notice. An Anthropic API key in Pi is fine; it is billed
-per token.
+| Route | Who sends the request | Rotation today |
+| --- | --- | --- |
+| `pi-claude-bridge` (`pi-claude/*` models) | the unmodified Claude Code binary, through the Claude Agent SDK | one account: the Claude Code login, unless a router is added |
+| `pi-multi-account` (`anthropic`, `anthropic-account-*` slots) | Pi itself, with the subscription's OAuth token | automatic across every `/login` slot |
 
-Separate Claude accounts therefore live where Claude Code runs:
+The SDK route is how T3's Claude provider works too. The direct route uses the
+subscription's OAuth token outside Claude Code, while Anthropic's
+[authentication terms](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+reserve that token for Claude Code and its own apps and allow enforcement
+without notice. Choose knowingly.
 
-- **T3:** one Claude provider instance per account, each with its own
-  `CLAUDE_CONFIG_DIR` ([T3 Code](t3-code.md#accounts)).
-- **Pi:** the bridge uses the default Claude Code login. It defines an
-  account-router contract (`kendex.pi.claude-account-router.v1`) for rotating
-  `CLAUDE_CONFIG_DIR` profiles, but no published extension implements it yet,
-  and `pi-multi-account` does not.
+**SDK route with several accounts.** Give each account its own Claude Code
+config directory and log in through Anthropic's flow:
 
-## pi-multi-account for the other providers
+```sh
+mkdir -p ~/.claude_personal
+CLAUDE_CONFIG_DIR=~/.claude_personal claude auth login
+```
 
-`pi-multi-account` rotates subscription accounts for Codex (ChatGPT), Cursor,
-Kimi, Qwen, and Ollama when one hits a quota. The dotfiles install the pinned
+The bridge rotates such profiles through its account-router contract
+(`kendex.pi.claude-account-router.v1`): a companion extension maps profile ids
+to `CLAUDE_CONFIG_DIR`s and receives rate-limit and failure reports. No
+published extension implements it yet, and `pi-multi-account` does not.
+
+**Direct route.** In Pi, `/login` → *Use a subscription* → Claude for the first
+account (`anthropic`), then `/multi-account add anthropic` and `/login` again
+with the slot it prints (for example `anthropic-account-2`). Separate Anthropic
+logins cannot be proven to be different people, so check the emails in
+`/multi-account accounts refresh`.
+
+## pi-multi-account
+
+`pi-multi-account` rotates subscription accounts for Anthropic, Codex (ChatGPT),
+Cursor, Kimi, Qwen, and Ollama when one hits a quota. The dotfiles install the pinned
 package; logging in stays a manual, per-machine step:
 
 ```text

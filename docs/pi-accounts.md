@@ -25,14 +25,15 @@ created and removed by the extension. `personal` is the existing login in
 ## Commands
 
 ```text
-/claude-account                       # every account: active one (▶), login, email, plan, usage, limits
+/claude-account list                  # every account: active one (▶), login, email, plan, usage, limits
+                                      # (also /claude-account with nothing after it)
+/claude-account usage                 # read each account's 5-hour/7-day usage now, then list
 /claude-account add work Mi trabajo   # create an account and sign in (browser opens)
 /claude-account login work            # sign in again, e.g. after a session expired
 /claude-account use work              # this conversation from the next turn, and new ones by default
 /claude-account next                  # the next logged-in account
 /claude-account rename work Trabajo
 /claude-account remove work           # sign out and delete it (asks first)
-/claude-account refresh               # read each account's 5-hour/7-day usage (no model request)
 /claude-account mode least-used       # this Pi process: failover | round-robin | least-used
 /claude-account switch auto           # this Pi process: let conversations move on their own
 /claude-account reset                 # forget cooldowns and failed logins

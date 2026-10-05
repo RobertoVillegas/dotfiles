@@ -44,11 +44,8 @@ Library/Preferences
 {{ else }}
 .config/devbox
 .config/opencode
-.agents/skills/agent-browser
 .agents/skills/devbox-network
 .claude/CLAUDE.md
-.claude/skills/agent-browser
-.claude/skills/devbox-network
 .codex
 .local
 {{ end }}
@@ -76,3 +73,16 @@ Library/Preferences
 {{ if ne .role "workstation" }}
 .config/herdr-mirror
 {{ end }}
+
+{{/* Machine state and credentials. Nothing provides these paths; listing them
+     makes `chezmoi add` refuse them, so a stray add cannot commit a token. */}}
+.agents/agents.lock
+.agents/.skill-lock.json
+.pi/agent/auth.json
+.pi/agent/models.json
+.pi/agent/models-store.json
+.pi/agent/provider-failover*
+.pi/agent/sessions
+.claude/.credentials.json
+.claude_*
+.t3

@@ -1,9 +1,10 @@
 # T3 Code on the devboxes
 
-T3 Code is the control surface for coding agents. The devbox remains the owner
-of the filesystem, Git checkout, terminals, provider authentication, and T3
-runtime state. Clients on desktop, web, and mobile connect to that server over
-the tailnet.
+T3 Code is the control surface for coding agents and, with Orchestrator V2, the
+layer that delegates work across them. The devbox remains the owner of the
+filesystem, Git checkout, terminals, provider authentication, and T3 runtime
+state. Clients on desktop, web, and mobile connect to that server over the
+tailnet.
 
 ```text
 T3 Desktop / Web / Mobile
@@ -13,7 +14,7 @@ T3 Desktop / Web / Mobile
             |
        T3 on devbox
             |
-  Codex / Claude / OpenCode
+  Claude / Codex / OpenCode / Pi
 ```
 
 The dotfiles provision the app or CLI and, on native Linux with systemd, register
@@ -26,16 +27,55 @@ client sessions, provider tokens, projects, threads, branches, or worktrees.
 | Tailscale | private HTTPS/WSS connectivity |
 | T3 server | agent/runtime state, projects, terminals, and T3 threads |
 | T3 clients | prompts, approvals, and change review |
-| Codex / Claude / OpenCode | coding-agent execution on the devbox |
+| Codex / Claude / OpenCode / Pi | coding-agent execution and their own authentication |
 | Git | branches and history |
 | Worktrunk | worktrees |
 | Herdr | independent persistent terminal workflows |
-| Pi | Herdr/CLI workflows for now |
+| Pi packages | Pi extensions, including `pi-subagents` and `pi-multi-account` |
+
+## Version and channel
+
+Orchestrator V2 (the Pi provider, `delegate_task`, and the orchestration MCP
+tools) ships only in the `0.0.46` nightlies; stable `0.0.45` does not have it.
+These dotfiles therefore track the nightly channel:
+
+| Piece | Where | Channel |
+| --- | --- | --- |
+| `t3` CLI and Linux service | `npm:t3` in `dot_config/mise/config.toml.tmpl` | exact nightly pin |
+| Desktop app (macOS) | `t3-code@nightly` cask in the Brewfile | nightly, self-updating |
+
+A V1 app cannot talk to a V2 server, and the client refuses a server with a
+different orchestration protocol. When a client reports a mismatch, bump the
+`npm:t3` pin to the version it names and apply; `dotfiles-outdated` compares the
+pin against the `nightly` dist-tag. Move back to stable once a stable release
+contains V2.
+
+The first V2 start copies `state.sqlite` to `statev2.sqlite` and migrates the
+copy. Titles, messages, modes, and branches carry over; live provider sessions,
+old checkpoints, diffs, and tool activity do not. See upstream issue
+[#14871](https://github.com/pingdotgg/t3code/issues/14871).
+
+### Provider versions
+
+T3 publishes a compatibility table per release. For `0.0.46`:
+
+| Provider | Supported | Pinned here |
+| --- | --- | --- |
+| Claude Code | `>= 2.1.280` | floor in `run_onchange_after_20-install-runtime-tools` |
+| Codex | `>= 0.156` (recommended `>= 0.159`) | mise |
+| OpenCode 2 | `>= 2.0.18` | floor in `run_onchange_after_20-install-runtime-tools` |
+| Pi | `>= 0.80.5` (recommended `>= 1.0`) | mise |
+
+The Settings → Providers **Update all** button installs providers with a global
+`npm install`, outside mise and these pins. Do not use it on machines managed by
+these dotfiles; bump the pin instead. If it happens anyway, the next apply removes
+any global npm copy of a package mise pins
+(`run_after_21-remove-shadowing-npm-globals`).
 
 ## What is installed
 
 All development profiles receive the pinned `t3` CLI through mise. Workstations
-and macOS devboxes receive the T3 Code cask. A native Linux devbox registers the
+and macOS devboxes receive the T3 Code nightly cask. A native Linux devbox registers the
 official systemd user service after mise is ready. WSL registers the same service
 inside Ubuntu while its managed `tailscale` wrapper delegates network operations
 to the Windows-owned `tailscale.exe`; it never installs a second `tailscaled`.
@@ -44,7 +84,7 @@ Verify the prerequisites in the same non-interactive shell an SSH launcher uses:
 
 ```sh
 ssh DEVBOX 'sh -lc "command -v node && node --version"'
-ssh DEVBOX 'sh -lc "codex --version; claude --version; opencode --version; t3 --version"'
+ssh DEVBOX 'sh -lc "codex --version; claude --version; opencode --version; pi --version; t3 --version"'
 ssh DEVBOX 'sh -lc "tailscale status"'
 ```
 
@@ -106,8 +146,10 @@ warning:
 npx t3@CLIENT_VERSION service update
 ```
 
-`@latest` is appropriate for a fresh manual install, but not for resolving a
-client/server mismatch: the server and client work best at the same version.
+`@latest` installs the stable channel, which has no Orchestrator V2; use the
+nightly version from the mise pin or from the client's mismatch notice. In any
+case use the exact version for a client/server mismatch: the server and client
+must speak the same orchestration protocol.
 Removal is explicit and destructive to availability, so it is never automated:
 
 ```sh
@@ -200,7 +242,122 @@ ssh DEVBOX
 herdr
 ```
 
-Pi remains outside T3 until it becomes an officially supported provider.
+## Pi as a provider
+
+Pi is a first-class T3 provider. T3 runs the user's own `pi` (the mise pin,
+found on the server's `PATH`) in RPC mode, so Pi keeps its models, extensions,
+skills, `AGENTS.md`, and authentication. Nothing Pi-specific is configured in
+T3 beyond enabling the provider in **Settings → Providers**.
+
+- Models come from Pi's own catalog, including every account alias created by
+  `pi-multi-account`, and the thinking picker shows the levels each model
+  supports. Do not copy model IDs into notes or scripts; `pi --list-models`
+  answers for the installed Pi.
+- Threads use Pi's native session files, so resume, rollback, and forks keep the
+  native conversation.
+- Blocking extension dialogs appear in the composer. Status lines and widgets do
+  not.
+- T3's permission modes act through Pi's tool hook. They are not a sandbox: a
+  trusted extension's own code still runs with Pi's permissions.
+
+## Two ways to run subagents
+
+```text
+Pi directly over SSH                 T3 as parent
+        |                                  |
+  Pi parent → pi-subagents           delegate_task → Claude / Codex / OpenCode / Pi
+  (children are Pi processes)        (children are T3 threads)
+```
+
+`pi-subagents` stays the tool for a Pi session opened directly in a terminal:
+its children are Pi processes with an explicit model and fallback chain.
+`delegate_task` is T3's: each child is a durable T3 thread on any provider and
+model, with its own history, and the result returns to the parent. Use T3 when
+the children should run on different harnesses, for example a Claude parent with
+Pi + GLM and Pi + DeepSeek children.
+
+### delegate_task
+
+Inside a T3 thread, the agent sees the orchestration tools under the `t3-code`
+MCP server (`mcp__t3-code__delegate_task` on Pi). Start with
+`orchestrator_capabilities`: it lists the provider instances and models that can
+run a child right now.
+
+The child receives only the task text and an optional role, never the parent's
+history, so the task must be self-contained. Runtime and interaction modes can
+stay equal or narrow; a child cannot escalate past its parent.
+
+Rules for reliable delegation on the current nightly:
+
+1. **Prefer `mode: "async"`** and follow up with `task_status`. A
+   `mode: "wait"` call longer than about five minutes dies in Node-based MCP
+   clients (Pi among them) without returning the `taskId`
+   ([#11168](https://github.com/pingdotgg/t3code/issues/11168)).
+2. **Always pass a `clientRequestId`**, unique per task and stable across
+   retries. Retrying with the same ID returns the same child instead of
+   dispatching a second one into the same checkout.
+3. **One writer per checkout.** A read-only reviewer can share the checkout with
+   one writer. Two writers need separate worktrees (`t3_thread_launch` with
+   `workspaceStrategy: "worktree"`, or Worktrunk) or must run in sequence.
+
+### Smoke test
+
+In a T3 project with a test suite, start a Claude thread and ask it to:
+
+1. call `orchestrator_capabilities` and confirm Pi lists the intended GLM and
+   DeepSeek models;
+2. `delegate_task` a read-only review to Pi + GLM (`role: "review"`,
+   `runtimeMode: "approval-required"`, `mode: "async"`, its own
+   `clientRequestId`);
+3. `delegate_task` the fix to Pi + DeepSeek (`role: "implementation"`,
+   `mode: "async"`, another `clientRequestId`), with instructions to run the
+   relevant tests and report the modified files;
+4. poll both with `task_status` and summarize their results.
+
+Pass when both children appear as separate threads on the requested
+provider and model, run at the same time, return their results to the parent,
+the reviewer changed no files, the tests pass, and repeating step 2 with the
+same `clientRequestId` returns the existing task.
+
+## Accounts
+
+Each harness owns its authentication; T3 does not unify it.
+
+- **Claude in T3:** keep one account in the default `~/.claude` and give each
+  additional account its own config directory on the server, then add a Claude
+  instance for it in **Settings → Providers** with that **CLAUDE_CONFIG_DIR**:
+
+  ```sh
+  mkdir -p ~/.claude_personal
+  CLAUDE_CONFIG_DIR=~/.claude_personal claude auth login
+  ```
+
+  Those directories hold credentials and stay outside chezmoi. A thread can only
+  switch between instances that share a config directory.
+- **Pi:** `pi-claude-bridge` uses Claude Code logins through the Agent SDK, and
+  `pi-multi-account` rotates the slots logged in through Pi's `/login`; T3 sees
+  both as Pi models. [Pi accounts](pi-accounts.md) compares the two routes for
+  Claude.
+- **Codex and OpenCode:** their own login on the devbox.
+
+No credential, `auth.json`, or T3 state belongs in these dotfiles. See
+[Pi accounts](pi-accounts.md).
+
+## Known V2 caveats
+
+- [#15221](https://github.com/pingdotgg/t3code/issues/15221): on Pi 1.0, a T3
+  turn is rejected with "Agent is already processing" when an extension starts a
+  run as the session resumes (for example a pending `pi-loop` iteration). Stop
+  the loop in Pi, or start a new thread.
+- [#15173](https://github.com/pingdotgg/t3code/issues/15173): a Claude parent
+  can be idle-released while it waits on a child; stopping it afterwards fails.
+  Another reason to prefer async delegation.
+- [#15581](https://github.com/pingdotgg/t3code/issues/15581): OpenCode 2 children
+  can stay running without output. Check `task_status` and cancel with
+  `task_cancel`.
+- Pi's `$` menu does not list project-local `.agents/skills` yet
+  ([#15810](https://github.com/pingdotgg/t3code/issues/15810)); global skills
+  work.
 
 ## Validate one server
 
@@ -214,7 +371,8 @@ Then verify behavior from the clients:
 
 1. Tailscale HTTPS opens from a second tailnet device.
 2. Desktop and mobile/web can open the same environment, project, and T3 thread.
-3. Codex, Claude Code, and OpenCode start on the devbox using its local auth.
+3. Codex, Claude Code, OpenCode, and Pi start on the devbox using its local auth,
+   and Pi lists its models and thinking levels.
 4. The chosen thread uses **Current checkout** and does not create a `t3code/*`
    branch or worktree.
 5. Closing a client does not stop the Linux service or macOS server.
@@ -227,6 +385,8 @@ imported into T3.
 ## References
 
 - [T3 Code README and supported providers](https://github.com/pingdotgg/t3code)
+- [Pi provider](https://github.com/pingdotgg/t3code/blob/main/docs/user/providers-pi.md)
+- [Orchestrator MCP server and delegate_task](https://github.com/pingdotgg/t3code/blob/main/docs/orchestration-v2/orchestrator-mcp-server.md)
 - [Remote access, pairing, Tailscale, and SSH launch](https://github.com/pingdotgg/t3code/blob/main/docs/user/remote-access.md)
 - [Linux background service](https://github.com/pingdotgg/t3code/blob/main/docs/user/background-service.md)
 - [Keeping client and server versions in sync](https://github.com/pingdotgg/t3code/blob/main/docs/user/updating.md)

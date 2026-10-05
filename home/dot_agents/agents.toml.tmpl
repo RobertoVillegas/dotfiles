@@ -1,0 +1,78 @@
+# Third-party Agent Skills, installed by dotagents into ~/.agents/skills.
+#
+# Chezmoi owns this manifest and the personal skills next to it; dotagents owns
+# the content of every skill declared here. A skill has exactly one owner, so a
+# name listed below must never also exist under home/dot_agents/skills.
+#
+# Sources follow upstream on purpose: no `ref`, so every apply installs the
+# newest commit that is at least four hours old. Upstream changes to these
+# skills are usually improvements, and the quarantine is the same one mise and
+# pnpm apply. Pin a `ref` only for a skill that must not move.
+#
+# ~/.agents/agents.lock is written by dotagents on every install and stays
+# machine-local: with unpinned sources it records what this host resolved, not
+# a contract another host should reproduce.
+#
+# Edit this file in the chezmoi source and apply; `dotagents add` would write to
+# the target and the next apply would revert it. See docs/skills.md.
+version = 1
+
+# Codex, OpenCode and Pi read ~/.agents/skills natively. Claude is left out on
+# purpose: the claude target replaces ~/.claude/skills with a symlink to the
+# shared directory, which would leak Claude's own synced/ and .trash/ entries
+# into every other agent. run_after_32-install-agent-skills links each skill
+# into ~/.claude/skills instead.
+agents = ["codex", "opencode", "pi"]
+
+# Minutes. Same 4-hour window as minimum_release_age in mise.
+minimum_release_age = 240
+
+# Skills are executable instructions. Only these repositories may be installed;
+# adding a source is a reviewed change to this list.
+[trust]
+github_repos = [
+  "mattpocock/skills",
+  "upstash/context7",
+  "vercel-labs/skills",
+  "stablyai/orca",
+{{- if eq .role "devbox" }}
+  "vercel-labs/agent-browser",
+{{- end }}
+]
+
+# mattpocock/skills, used unmodified. grill-me and wait-what are local
+# adaptations of the same repository and stay personal.
+[[skills]]
+name = "diagnosing-bugs"
+source = "mattpocock/skills"
+
+[[skills]]
+name = "grilling"
+source = "mattpocock/skills"
+
+[[skills]]
+name = "prototype"
+source = "mattpocock/skills"
+
+[[skills]]
+name = "writing-for-agents"
+source = "mattpocock/skills"
+
+[[skills]]
+name = "find-docs"
+source = "upstash/context7"
+
+[[skills]]
+name = "find-skills"
+source = "vercel-labs/skills"
+
+[[skills]]
+name = "orchestration"
+source = "stablyai/orca"
+{{- if eq .role "devbox" }}
+
+# The devbox runs the browser; the workstation has its own browser tooling.
+[[skills]]
+name = "agent-browser"
+source = "vercel-labs/agent-browser"
+{{- end }}

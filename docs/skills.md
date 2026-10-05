@@ -1,76 +1,106 @@
 # Agent skills
 
-Chezmoi owns the canonical, reviewed copy of every portable skill in
-`~/.agents/skills`. Claude only gets symlinks from `~/.claude/skills`; do not
-keep a second copy per agent and do not symlink directly to a checkout of an
-upstream repository. A checkout can disappear, and a plain `git pull` would
-otherwise change executable agent instructions without review.
+Every skill lives once in `~/.agents/skills`. Each skill has exactly one owner:
 
-## Exact upstream skills
+| Owner | Owns | Where it is declared |
+| --- | --- | --- |
+| chezmoi | personal and locally adapted skills | `home/dot_agents/skills/<name>/` |
+| dotagents | third-party skills used unmodified | `home/dot_agents/agents.toml.tmpl` |
 
-`herdr` and `orchestration` are installed without local modifications. Herdr's
-reviewed copy matches the bundled `herdr --skill` from version `0.9.3`; keep it
-aligned with the Herdr pin in the mise inventory. Update it from that release,
-review the diff, and import it into chezmoi:
-
-```sh
-herdr --skill > ~/.agents/skills/herdr/SKILL.md
-chezmoi re-add ~/.agents/skills/herdr
-chezmoi diff ~/.agents/skills/herdr
+```text
+chezmoi apply
+  ├── personal skills        → ~/.agents/skills/<name>   (chezmoi)
+  ├── ~/.agents/agents.toml  (chezmoi)
+  └── run_after_32-install-agent-skills
+        ├── dotagents install → ~/.agents/skills/<name>   (dotagents)
+        └── ~/.claude/skills/<name> → ~/.agents/skills/<name>   (symlinks)
 ```
 
-`orchestration` is updated on the
-authoring workstation, then import the reviewed result back into the source
-state:
+Codex, OpenCode, and Pi read `~/.agents/skills` directly. Claude Code does not,
+so the script links every skill there into `~/.claude/skills`. It creates and
+removes only symlinks; Claude's own `synced/` and `.trash/` directories are never
+touched. That is also why `claude` is not a dotagents target: that target turns
+`~/.claude/skills` into a symlink to the shared directory, which would expose
+Claude's synced skills to every other agent.
+
+## Inventory
+
+Personal (chezmoi):
+
+| Skill | Why it is personal |
+| --- | --- |
+| `devbox-network` | written for these devboxes (devbox only) |
+| `herdr` | the output of `herdr --skill` for the pinned Herdr binary |
+| `grill-me` | `mattpocock/skills`, adapted: model-invocable, links to `grilling` by path |
+| `wait-what` | `mattpocock/skills`, adapted: model-invocable, explicit trigger |
+| `show-me` | `humanlayer/skills`, adapted: no macOS `open`, model-invocable |
+
+Third-party (dotagents): `diagnosing-bugs`, `grilling`, `prototype`, and
+`writing-for-agents` from `mattpocock/skills`; `find-docs` from
+`upstash/context7`; `find-skills` from `vercel-labs/skills`; `orchestration` from
+`stablyai/orca`; and, on devboxes only, `agent-browser` from
+`vercel-labs/agent-browser`.
+
+An adapted copy is a fork, so it stays personal. Declaring it in dotagents would
+replace the adaptation with upstream on the next install.
+
+## Versions follow upstream
+
+Third-party sources carry no `ref`. Each apply installs the newest upstream
+commit that is at least four hours old (`minimum_release_age = 240`), the same
+quarantine mise and pnpm use. The daily `dotfiles-autoupdate` is therefore what
+moves them forward. Pin a `ref` (tag or commit) only for a skill that must not
+move.
+
+`~/.agents/agents.lock` is not managed by chezmoi. dotagents rewrites it on every
+install, and its `resolved_commit` is informational: dotagents 3 has no frozen
+install mode (`--frozen` is deprecated and installs normally). Versioning it
+would make every apply revert what the install just wrote.
+
+The dotagents CLI itself is pinned in the mise inventory.
+
+## Trust
+
+Skills are executable agent instructions. `[trust]` in the manifest allowlists
+exact repositories; dotagents rejects any other source before touching the
+network. Adding a repository is a reviewed change to that list. Do not use
+`allow_all`, and do not add a whole GitHub organization when one repository is
+enough.
+
+## Add, update, or remove a skill
+
+Edit the chezmoi source, not the target: `dotagents add` writes to
+`~/.agents/agents.toml`, and the next apply would revert it.
 
 ```sh
-npx skills update orchestration --global
-chezmoi re-add ~/.agents/skills/orchestration
-chezmoi diff
+chezmoi edit ~/.agents/agents.toml   # add or remove a [[skills]] entry and its trust rule
+chezmoi apply                         # installs, prunes, and relinks for Claude
+dotagents list                        # every declared skill should be ✓
 ```
 
-The global `~/.agents/.skill-lock.json` remains machine-local. It contains the
-inventory and install timestamps for every skill installed with `npx skills` on
-that host, so synchronizing it would delete unrelated registrations on another
-machine. On a machine where `orchestration` has not been registered yet, run
-`npx skills add stablyai/orca@orchestration --global --yes` once; chezmoi still
-owns the reviewed skill contents delivered to every host.
+Removing an entry deletes that skill from `~/.agents/skills`; the script then
+removes its dangling Claude link. To make a third-party skill personal (to adapt
+it), remove its entry first, apply, then add the adapted copy under
+`home/dot_agents/skills` and record why in the table above.
 
-Commit and merge that change before applying it on another machine. The devbox
-does not need to contact the skill repository: its normal signed dotfiles update
-delivers the reviewed files.
+To refresh before the next scheduled update, run `chezmoi apply` or
+`(cd / && dotagents install)`.
 
-## Adapted upstream skills
+## Discovery is not installation
 
-The following skills are vendored because they contain small portability or
-invocation adaptations:
+Use `npx skills find` (or the `find-skills` skill) and https://skills.sh/ to
+explore the ecosystem. Do not install with `npx skills add --global`: it writes
+untracked copies and its own `~/.agents/.skill-lock.json`, which no other machine
+reproduces. Declare what you keep in the manifest. Hosts migrated from that flow
+may still carry `.skill-lock.json`; it is harmless and can be deleted.
 
-- `mattpocock/skills`: `diagnosing-bugs`, `grill-me`, `grilling`, `prototype`,
-  `wait-what`, and `writing-for-agents` (last reviewed at
-  `3cca18b368ae95cdbdebbff572ccafa662551015`).
-- `humanlayer/skills`: `show-me` (last reviewed at
-  `3c2629142c5d437428269b1b722b08c0b87f574d`).
-
-Do not register these as globally updatable skills: an unattended
-`npx skills update --global` would overwrite the local adaptations. To audit a
-new upstream revision, install clean copies in a temporary project and compare
-them with the chezmoi source:
+## Diagnose
 
 ```sh
-audit_dir="$(mktemp -d /tmp/dotfiles-skills-audit.XXXXXX)"
-cd "$audit_dir"
-npx skills add mattpocock/skills \
-  --skill diagnosing-bugs --skill grill-me --skill grilling \
-  --skill prototype --skill wait-what --skill writing-for-agents \
-  --agent codex --yes
-npx skills add humanlayer/skills --skill show-me --agent codex --yes
-for skill in diagnosing-bugs grill-me grilling prototype wait-what \
-  writing-for-agents show-me; do
-  diff -ru "$(chezmoi source-path)/home/dot_agents/skills/$skill" \
-    ".agents/skills/$skill"
-done
+dotagents list        # ✓ installed, ✗ missing, ? unlocked
+dotagents doctor
+devbox-doctor         # includes the same check on devboxes
 ```
 
-Port the wanted upstream changes into `home/dot_agents/skills`, preserving the
-local adaptations, then run `chezmoi diff` and `chezmoi apply`. Update the
-reviewed commit IDs above in the same change.
+`dotagents sync` adopts unknown local skills into the manifest, so do not run it
+on the global scope: the personal skills would gain a second owner.

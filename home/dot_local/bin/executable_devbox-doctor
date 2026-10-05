@@ -93,7 +93,8 @@ for pi_package in \
   npm:@vanillagreen/pi-claude-bridge \
   npm:pi-cursor-sdk \
   npm:@estebanforge/pi-antigravity-bridge \
-  npm:pi-service-tier; do
+  npm:pi-service-tier \
+  npm:pi-multi-account; do
   if ! [ -f "$pi_settings" ] ||
     ! jq -e --arg package "$pi_package" \
       '.packages[]? | select(type == "string" and sub("@[^@/]*$"; "") == $package)' \
@@ -106,6 +107,20 @@ if [ -z "$missing_pi_packages" ]; then
   pass "Managed Pi package set is installed"
 else
   fail "Managed Pi packages are missing: $missing_pi_packages"
+fi
+
+# dotagents reports every declared skill as ok, missing or unlocked.
+if command -v dotagents >/dev/null 2>&1; then
+  skill_problems="$(cd / && dotagents list --json 2>/dev/null |
+    jq -r '[.skills[]? | select(.status != "ok") | "\(.name) (\(.status))"] | join(", ")' 2>/dev/null)" ||
+    skill_problems="unreadable dotagents state"
+  if [ -z "$skill_problems" ]; then
+    pass "Third-party Agent Skills declared in ~/.agents/agents.toml are installed"
+  else
+    fail "Third-party Agent Skills need attention: $skill_problems"
+  fi
+else
+  fail "dotagents is not installed"
 fi
 
 pi_trust="$(jq -r '.defaultProjectTrust // "ask"' "$pi_settings" 2>/dev/null || echo ask)"

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Owns two things in T3 Code's settings and leaves the rest to T3, which
+# writes the same file from its UI and watches it for changes:
+#
+# - Pi is an enabled provider instance. T3 runs the user's own `pi`, so its
+#   models, extensions and Claude accounts (claude-accounts) come along.
+# - New threads default to Pi, with model "default": T3's sentinel for "let
+#   Pi pick its own default model". Applied only when the default is not Pi
+#   already, so a Pi model chosen in the UI is kept.
+#
+# chezmoi passes the current file on stdin and writes back stdout. Without jq
+# the file passes through unchanged and the next apply sets the keys.
+set -euo pipefail
+
+current="$(cat)"
+[ -n "$current" ] || current='{}'
+
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s' "$current"
+  exit 0
+fi
+
+printf '%s' "$current" | jq '
+  .providerInstances.pi = ((.providerInstances.pi // {}) + { driver: "pi", displayName: "Pi", enabled: true })
+  | if (.defaultModelSelection.instanceId // "") == "pi" then .
+    else .defaultModelSelection = { instanceId: "pi", model: "default" } end
+'

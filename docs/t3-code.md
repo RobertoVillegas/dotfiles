@@ -244,10 +244,18 @@ herdr
 
 ## Pi as a provider
 
-Pi is a first-class T3 provider. T3 runs the user's own `pi` (the mise pin,
-found on the server's `PATH`) in RPC mode, so Pi keeps its models, extensions,
-skills, `AGENTS.md`, and authentication. Nothing Pi-specific is configured in
-T3 beyond enabling the provider in **Settings → Providers**.
+Pi is a first-class T3 provider and the default for new threads here. T3 runs
+the user's own `pi` (the mise pin, found on the server's `PATH`) in RPC mode,
+so Pi keeps its models, extensions, skills, `AGENTS.md`, and authentication,
+including the Claude subscriptions managed by `claude-accounts`.
+
+The dotfiles keep two things in `~/.t3/userdata/settings.json` through
+`modify_settings.json`, and leave everything else to T3: Pi is an enabled
+provider instance, and new threads default to Pi with model `default`, T3's
+value for "Pi's own default model". The default is only set when it is not Pi
+already, so a Pi model picked in the UI stays. T3 watches the file, so an apply
+takes effect without restarting it. The rest of `~/.t3` (tokens, sessions,
+databases) is never managed, and `chezmoi add` refuses it.
 
 - Models come from Pi's own catalog, and the thinking picker shows the levels
   each model supports. Do not copy model IDs into notes or scripts; `pi --list-models`
@@ -322,15 +330,15 @@ same `clientRequestId` returns the existing task.
 
 Each harness owns its authentication; T3 does not unify it.
 
-- **Claude in T3:** keep one account in the default `~/.claude`. For each
-  account added in Pi with `/claude-account add <name>`, add a Claude instance
-  in **Settings → Providers** with **CLAUDE_CONFIG_DIR** set to
-  `~/.claude-accounts/<name>`; the login made from Pi serves T3 too. Those
-  directories hold credentials and stay outside chezmoi. A thread can only
-  switch between instances that share a config directory.
-- **Pi:** `pi-claude-bridge` uses Claude Code logins through the Agent SDK, and
-  the `claude-accounts` extension switches between your Claude subscriptions in
-  Pi threads too ([Pi accounts](pi-accounts.md)).
+- **Pi (the default):** `pi-claude-bridge` uses Claude Code logins through the
+  Agent SDK, and the `claude-accounts` extension switches between your Claude
+  subscriptions in Pi threads exactly as in the terminal
+  ([Pi accounts](pi-accounts.md)). Nothing else is needed in T3.
+- **Claude Code directly in T3 (optional):** only to run Claude Code itself as a
+  T3 provider instead of through Pi. Add a Claude instance per extra account in
+  **Settings → Providers** with **CLAUDE_CONFIG_DIR** set to
+  `~/.claude-accounts/<name>`; the login made from Pi serves it too. A thread
+  can only switch between instances that share a config directory.
 - **Codex and OpenCode:** their own login on the devbox.
 
 No credential, `auth.json`, or T3 state belongs in these dotfiles. See

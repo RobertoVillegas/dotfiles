@@ -39,6 +39,7 @@ Library/Preferences
 .claude
 .codex
 .pi
+.t3
 .local
 {{ else if eq .role "devbox" }}
 .config/ghostty
@@ -88,4 +89,9 @@ Library/Preferences
 .claude-*
 .pi/agent/claude-accounts-state.json
 .claude-accounts
-.t3
+{{/* T3 keeps tokens, sessions and databases under ~/.t3; only its settings
+     file is managed (modify_settings.json). */}}
+.t3/**
+!.t3
+!.t3/userdata
+!.t3/userdata/settings.json

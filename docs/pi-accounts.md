@@ -1,20 +1,20 @@
 # Pi accounts
 
-Two extensions decide which account a Pi request uses.
+Two mechanisms decide which account a Pi request uses.
 
 | Provider in Pi | Extension | Accounts |
 | --- | --- | --- |
-| `pi-claude/*` (Claude via the Agent SDK) | `@vanillagreen/pi-claude-bridge` | Claude Code logins |
+| `pi-claude/*` (Claude via the Agent SDK) | `pi-claude-bridge` + `claude-accounts` | Claude Code config directories |
 | `anthropic*`, `openai-codex*`, `cursor*`, `kimi*`, `qwen*`, `ollama*` | `pi-multi-account` | every slot logged in with Pi's `/login` |
 
 ## Several Claude subscription accounts in Pi
 
 There are two routes, and they differ in who talks to Anthropic:
 
-| Route | Who sends the request | Rotation today |
+| Route | Who sends the request | Switching |
 | --- | --- | --- |
-| `pi-claude-bridge` (`pi-claude/*` models) | the unmodified Claude Code binary, through the Claude Agent SDK | one account: the Claude Code login, unless a router is added |
-| `pi-multi-account` (`anthropic`, `anthropic-account-*` slots) | Pi itself, with the subscription's OAuth token | automatic across every `/login` slot |
+| `pi-claude-bridge` + `claude-accounts` (`pi-claude/*` models) | the unmodified Claude Code binary, through the Claude Agent SDK | `/claude-account`, and automatic on limits |
+| `pi-multi-account` (`anthropic`, `anthropic-account-*` slots) | Pi itself, with the subscription's OAuth token | `/multi-account`, and automatic on limits |
 
 The SDK route is how T3's Claude provider works too. The direct route uses the
 subscription's OAuth token outside Claude Code, while Anthropic's
@@ -22,18 +22,55 @@ subscription's OAuth token outside Claude Code, while Anthropic's
 reserve that token for Claude Code and its own apps and allow enforcement
 without notice. Choose knowingly.
 
-**SDK route with several accounts.** Give each account its own Claude Code
-config directory and log in through Anthropic's flow:
+**SDK route with several accounts.** The `claude-accounts` extension
+(`~/.pi/agent/extensions/claude-accounts/`) implements the bridge's
+account-router contract (`kendex.pi.claude-account-router.v1`). Each account is
+a Claude Code config directory, declared in `~/.pi/agent/claude-accounts.json`:
+
+| Id | Directory |
+| --- | --- |
+| `personal` | `~/.claude` |
+| `work` | `~/.claude-work` |
+
+Log each one in through Anthropic's own flow, once per machine:
 
 ```sh
-mkdir -p ~/.claude_personal
-CLAUDE_CONFIG_DIR=~/.claude_personal claude auth login
+CLAUDE_CONFIG_DIR=~/.claude-work claude auth login
 ```
 
-The bridge rotates such profiles through its account-router contract
-(`kendex.pi.claude-account-router.v1`): a companion extension maps profile ids
-to `CLAUDE_CONFIG_DIR`s and receives rate-limit and failure reports. No
-published extension implements it yet, and `pi-multi-account` does not.
+Then, in any Pi conversation on a `pi-claude/*` model:
+
+```text
+/claude-account              # accounts, identity, usage, cooldowns
+/claude-account use work     # this conversation from the next turn, and new ones by default
+/claude-account next         # the other account
+/claude-account mode least-used   # for this Pi process; the file keeps the default
+/claude-account reset        # forget cooldowns and failed logins
+```
+
+The status bar shows the active account. A switch mid-conversation is safe: the
+bridge rebuilds the Claude Code session from Pi's history under the new account.
+It is not free, though: the prompt cache belongs to the account, so the first
+turn after a switch pays for the whole context again. That is why a conversation
+stays on its account until you switch it or the account runs out, and why
+`round-robin` alternates conversations, not turns.
+
+Log in on the machine that runs Pi, from its usual network. Logins and traffic
+from datacenter IPs or several machines at once are what draws scrutiny, so the
+devboxes at home are fine and a cloud VPS is not.
+
+| Mode | New conversation gets | When an account hits its limit |
+| --- | --- | --- |
+| `failover` (default) | the preferred account | the same turn moves to the other one |
+| `round-robin` | the next account in turn | same |
+| `least-used` | the lowest 5-hour/7-day usage Claude Code reported | same |
+
+A limited account stays out until the reset time Claude Code reports (one hour
+without one). A limit on one model family, such as weekly Opus, only blocks that
+model. A failed login is retried after ten minutes or on `use`. Cooldowns live in
+`~/.pi/agent/claude-accounts-state.json`, shared by every Pi window on the
+machine. Usage figures only appear once Claude Code reports them for an account,
+so `least-used` treats an account without figures as unused.
 
 **Direct route.** In Pi, `/login` → *Use a subscription* → Claude for the first
 account (`anthropic`), then `/multi-account add anthropic` and `/login` again
@@ -82,6 +119,7 @@ its access token in memory.
 | `~/.pi/agent/provider-failover*.json` | `pi-multi-account` (config, cooldowns) | never |
 | `~/.pi/agent/provider-failover-debug.log` | `pi-multi-account` | never |
 | `~/.claude*/` | Claude Code | never |
+| `~/.pi/agent/claude-accounts-state.json` | `claude-accounts` (cooldowns, usage) | never |
 
 `models.json` looks like configuration but is generated: versioning it would
 overwrite the aliases on every apply. `.chezmoiignore` lists these paths so

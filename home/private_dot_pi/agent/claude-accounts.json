@@ -1,0 +1,7 @@
+{
+  "mode": "failover",
+  "profiles": [
+    { "id": "personal", "label": "Claude Pro personal", "configDir": "~/.claude" },
+    { "id": "work", "label": "Claude Pro trabajo", "configDir": "~/.claude-work" }
+  ]
+}

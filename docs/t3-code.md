@@ -328,8 +328,8 @@ Each harness owns its authentication; T3 does not unify it.
   instance for it in **Settings → Providers** with that **CLAUDE_CONFIG_DIR**:
 
   ```sh
-  mkdir -p ~/.claude_personal
-  CLAUDE_CONFIG_DIR=~/.claude_personal claude auth login
+  mkdir -p ~/.claude-work
+  CLAUDE_CONFIG_DIR=~/.claude-work claude auth login
   ```
 
   Those directories hold credentials and stay outside chezmoi. A thread can only

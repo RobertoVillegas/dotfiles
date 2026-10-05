@@ -306,3 +306,20 @@ test("a success marks an account as logged in", () => {
 	router.recordSuccess("fun");
 	assert.equal(router.profile("fun")?.loggedIn, true);
 });
+
+test("a rejection's unified windows become the account's usage", () => {
+	const { router, now } = setup();
+	router.state.usageUnavailable = { work: true };
+	const weekReset = Math.round(now() / 1000) + 86400;
+	router.recordRateLimit("work", {
+		status: "rejected",
+		rateLimitType: "seven_day",
+		resetsAt: weekReset,
+		unifiedWindows: { five_hour: { utilization: 0, resetsAt: weekReset - 3600 }, seven_day: { utilization: 1, resetsAt: weekReset } },
+	}, OPUS);
+	assert.equal(router.state.usage.work?.sevenDay?.utilization, 100);
+	assert.equal(router.state.usage.work?.fiveHour?.utilization, 0);
+	assert.equal(router.state.usage.work?.sevenDay?.resetsAt, weekReset * 1000);
+	assert.equal(router.state.usageUnavailable.work, undefined);
+	assert.equal(router.available("work", OPUS), false);
+});

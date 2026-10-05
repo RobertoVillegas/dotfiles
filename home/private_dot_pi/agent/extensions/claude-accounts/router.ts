@@ -85,8 +85,11 @@ const LOGIN_RETRY_MS = 10 * 60_000;
 /** Conversations untouched for this long are forgotten. */
 const SESSION_TTL_MS = 30 * 24 * 3600_000;
 
-/** A rate-limit type naming a model family only blocks that model. */
-const MODEL_SCOPED = /opus|sonnet|haiku|fable/i;
+/** Claude Code reports account-wide windows (five_hour, seven_day) and, on
+ *  plans that have them, weekly windows per model family (seven_day_opus,
+ *  seven_day_sonnet). A family window blocks every model of that family. */
+const FAMILY = /opus|sonnet|haiku|fable/i;
+const family = (text: string) => FAMILY.exec(text)?.[0].toLowerCase();
 
 export class NoProfileAvailable extends Error {
 	resetAtMs?: number;
@@ -167,7 +170,8 @@ export class AccountRouter {
 	/** Earliest moment the profile can serve this model, or 0 when it can now. */
 	blockedUntil(id: string, modelId: string): number {
 		const t = this.now();
-		const until = Math.max(this.state.cooldowns[id] ?? 0, this.state.cooldowns[`${id}|${modelId}`] ?? 0);
+		const fam = family(modelId);
+		const until = Math.max(this.state.cooldowns[id] ?? 0, fam ? (this.state.cooldowns[`${id}|${fam}`] ?? 0) : 0);
 		return until > t ? until : 0;
 	}
 
@@ -329,7 +333,8 @@ export class AccountRouter {
 		const type = String(info?.rateLimitType ?? info?.rate_limit_type ?? info?.type ?? "");
 		const reset = toMs(info?.resetsAt ?? info?.resets_at ?? info?.resetAt ?? info?.reset_at);
 		const until = reset && reset > this.now() ? reset : this.now() + DEFAULT_RATE_LIMIT_MS;
-		const key = MODEL_SCOPED.test(type) ? `${id}|${modelId}` : id;
+		const fam = family(type);
+		const key = fam ? `${id}|${fam}` : id;
 		this.state.cooldowns[key] = Math.max(this.state.cooldowns[key] ?? 0, until);
 		this.persist(this.state);
 		return until;

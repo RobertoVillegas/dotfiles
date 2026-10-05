@@ -75,11 +75,20 @@ test("a rate limit fails the conversation over until the reset", () => {
 	assert.equal(router.acquire({ modelId: OPUS, sessionId: "s3" }).profileId, "personal");
 });
 
-test("a model-scoped limit leaves other models on the same account", () => {
+test("a family limit blocks that family on the account and nothing else", () => {
 	const { router } = setup();
 	router.recordRateLimit("personal", { rateLimitType: "seven_day_opus" }, OPUS);
 	assert.equal(router.acquire({ modelId: OPUS, sessionId: "a" }).profileId, "work");
+	assert.equal(router.acquire({ modelId: "claude-opus-5-5", sessionId: "c" }).profileId, "work");
 	assert.equal(router.acquire({ modelId: "claude-sonnet-5-5", sessionId: "b" }).profileId, "personal");
+});
+
+test("account-wide windows block every model", () => {
+	const { router } = setup();
+	router.recordRateLimit("personal", { rateLimitType: "five_hour" }, OPUS);
+	assert.equal(router.acquire({ modelId: "claude-sonnet-5-5", sessionId: "a" }).profileId, "work");
+	router.recordRateLimit("work", { rateLimitType: "seven_day" }, OPUS);
+	assert.equal(router.available("work", "claude-haiku-4-5"), false);
 });
 
 test("with every account limited, acquire reports the earliest reset", () => {

@@ -21,8 +21,9 @@ set shared with workstations. macOS receives Tailscale and OrbStack; Linux
 receives Docker clients but leaves the daemon to the distribution package
 manager.
 
-T3 Code provides a remote control surface over the Codex, Claude Code, and
-OpenCode installations already on the host. On macOS the T3 app owns the server;
+T3 Code provides a remote control surface over the Codex, Claude Code,
+OpenCode, and Pi installations already on the host, and delegates work across
+them with Orchestrator V2. On macOS the T3 app owns the server;
 on native Linux the official systemd user service is installed once. Pairing,
 Tailscale Serve, projects, and Git workspace policy require deliberate setup and
 are documented in [T3 Code](t3-code.md).
@@ -41,9 +42,11 @@ terminal code editor installed from its pinned official installer into
 during SSH login. macOS also gets Mole's `mo` command for interactive
 maintenance and disk analysis.
 
-The dotfiles install and update the reviewed Pi extensions, including MCP,
-Claude Code, Cursor SDK, and Antigravity bridges. Pi credentials, sessions,
-memory, backups, and local settings remain machine-private.
+The dotfiles install and update the reviewed Pi extensions, including the
+Claude Code, Cursor SDK, and Antigravity bridges, `pi-subagents`, and
+`pi-multi-account`. Pi credentials, sessions, memory, backups, account state,
+and local settings remain machine-private; logging in additional accounts is
+described in [Pi accounts](pi-accounts.md).
 
 Antigravity CLI is installed from Google's native installer as `agy` in
 `~/.local/bin`. The binary manages its own updates; authentication and local
@@ -240,15 +243,17 @@ prompt injection; other security policies remain task-specific.
 ## Global agent skills
 
 Codex, Pi, and OpenCode discover the portable skills in `~/.agents/skills`.
-Claude Code receives symlinks to the same source files under
-`~/.claude/skills`. Pi also receives the shared devbox policy through
-`~/.pi/agent/AGENTS.md`.
+Claude Code receives symlinks to the same directories under
+`~/.claude/skills`. Personal skills come from chezmoi and third-party skills
+from dotagents; [Agent skills](skills.md) explains the split. Pi also receives
+the shared devbox policy through `~/.pi/agent/AGENTS.md`.
 
 - `herdr` teaches agents to inspect and control Herdr only from a managed pane.
 - `find-skills` searches the public agent-skills ecosystem.
 - `find-docs` is Context7's official documentation lookup workflow.
 - `grill-me`, `grilling`, `wait-what`, `diagnosing-bugs`, `prototype`, and
-  `writing-for-agents` are the reviewed Matt Pocock workflows.
+  `writing-for-agents` are Matt Pocock's workflows (`grill-me` and `wait-what`
+  locally adapted).
 - `show-me` provides portable visual explanations, and `orchestration` connects
   agents to the Orca coordination guide when the Orca runtime is available.
 - `agent-browser` and `devbox-network` cover browser automation and leased,

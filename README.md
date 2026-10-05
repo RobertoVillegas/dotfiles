@@ -74,8 +74,9 @@ Tailscale y Zen. Durante el setup se puede elegir Zed, VS Code, ambos o ninguno.
 Las skills portables de Herdr, descubrimiento y documentación actual se
 comparten con el perfil devbox.
 
-Las skills viven una sola vez en `~/.agents/skills`; Claude apunta a ellas con
-symlinks. La política y el flujo para revisar actualizaciones upstream están en
+Las skills viven una sola vez en `~/.agents/skills`: chezmoi instala las
+personales y [dotagents](https://github.com/getsentry/dotagents) las de terceros
+declaradas en `~/.agents/agents.toml`; Claude apunta a todas con symlinks. La política y el flujo para revisar actualizaciones upstream están en
 [docs/skills.md](docs/skills.md).
 
 ### Preparar una Mac personal
@@ -146,12 +147,14 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 
 - SSH y Mosh sobre Tailscale.
 - Herdr, Hunk, tmux y herramientas de terminal.
-- T3 Code como control surface de Codex, Claude Code y OpenCode en la devbox.
+- T3 Code (Orchestrator V2, canal nightly) como control surface de Codex,
+  Claude Code, OpenCode y Pi, con delegación entre ellos.
 - Node LTS, npm, pnpm, Bun y CLIs globales administrados por mise.
 - Antigravity, Codex, Claude Code, OpenCode, Pi y Prime Agent.
 - Ax y Agent Browser para acceso y automatización web.
 - Context7 por CLI para consultar documentación actual, sin MCP.
-- Skills globales para Herdr, descubrimiento y documentación.
+- Skills globales para Herdr, descubrimiento y documentación; las de terceros
+  siguen upstream mediante dotagents.
 - Fastfetch, bottom/btop y utilidades modernas para procesos, disco, tareas y archivos.
 - LazyGit y Delta para Git, ghui para pull requests y LazyDocker para contenedores.
 - Druk como editor TUI ligero y terminal-code (`tode`) para ejecutar una
@@ -337,6 +340,12 @@ robada sería ejecución de código en las dos devbox. Cuatro capas:
    Para un hotfix legítimo dentro de la ventana: `minimumReleaseAgeExclude` en
    ese proyecto, o `minimum_release_age_excludes` en mise.
 
+   Los CLIs de agente de primera mano (Codex, Pi y T3) están en
+   `minimum_release_age_excludes`: su proveedor ya tiene acceso total a la
+   máquina y T3 exige versiones mínimas que cambian con cada release. Claude Code
+   y OpenCode se actualizan solos fuera de mise. Las extensiones de terceros
+   (paquetes de Pi, plugins de Herdr, skills) siguen en cuarentena.
+
 ### Política de versiones
 
 Todo se fija a una versión exacta, no a `latest`. Un `latest` se resuelve el día
@@ -349,7 +358,10 @@ Las versiones viven junto a cada instalador:
 | Herramienta | Dónde |
 | --- | --- |
 | node, pnpm, bun, Herdr, Worktrunk y CLIs de npm como Portless | `dot_config/mise/config.toml.tmpl` |
-| Claude Code | `run_onchange_after_20-install-runtime-tools.sh.tmpl` |
+| Claude Code y OpenCode (piso, se autoactualizan) | `run_onchange_after_20-install-runtime-tools.sh.tmpl` |
+| Paquetes de Pi | `run_onchange_after_27-install-pi-packages.sh.tmpl` |
+| Skills de terceros (siguen upstream) | `dot_agents/agents.toml.tmpl` |
+| T3 Code (nightly) | `npm:t3` en mise + cask `t3-code@nightly` |
 | Druk | `dot_config/dotfiles/Brewfile.tmpl` (`letstri/tap`) |
 | Ax, terminal-code y Prime Agent | su propio `run_onchange_after_*` |
 | Plugins de Herdr | `run_onchange_after_30-install-herdr-plugins.sh.tmpl` (`--ref`) |

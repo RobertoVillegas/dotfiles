@@ -38,7 +38,6 @@ Library/Preferences
 .agents
 .claude
 .codex
-.pi
 .local
 {{ else if eq .role "devbox" }}
 .config/ghostty
@@ -82,9 +81,8 @@ Library/Preferences
 .pi/agent/auth.json
 .pi/agent/models.json
 .pi/agent/models-store.json
+.pi/agent/provider-failover*
 .pi/agent/sessions
 .claude/.credentials.json
 .claude_*
-.claude-*
-.pi/agent/claude-accounts-state.json
 .t3

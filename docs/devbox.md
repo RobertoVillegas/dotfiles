@@ -43,10 +43,10 @@ during SSH login. macOS also gets Mole's `mo` command for interactive
 maintenance and disk analysis.
 
 The dotfiles install and update the reviewed Pi extensions, including the
-Claude Code, Cursor SDK, and Antigravity bridges, `pi-subagents`, and the
-`claude-accounts` extension. Pi credentials, sessions, memory, backups, account
-state, and local settings remain machine-private; logging in additional Claude
-accounts is described in [Pi accounts](pi-accounts.md).
+Claude Code, Cursor SDK, and Antigravity bridges, `pi-subagents`, and
+`pi-multi-account`. Pi credentials, sessions, memory, backups, account state,
+and local settings remain machine-private; logging in additional accounts is
+described in [Pi accounts](pi-accounts.md).
 
 Antigravity CLI is installed from Google's native installer as `agy` in
 `~/.local/bin`. The binary manages its own updates; authentication and local

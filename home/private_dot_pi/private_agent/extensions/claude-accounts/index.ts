@@ -349,7 +349,7 @@ function describe(router: AccountRouter, modelId: string, sessionId: string | un
 		);
 	}
 	lines.push(
-		"Use: /claude-account use <name> | next | add <name> [label] | login <name> | rename <name> <label> | remove <name> | refresh | mode <failover|round-robin|least-used> | switch <ask|auto> | reset",
+		"Use: /claude-account list | usage | use <name> | next | add <name> [label] | login <name> | rename <name> <label> | remove <name> | mode <failover|round-robin|least-used> | switch <ask|auto> | reset",
 	);
 	return lines.join("\n");
 }
@@ -491,7 +491,7 @@ export default function (pi: ExtensionAPI) {
 		description: "Add, sign in, show or switch the Claude subscriptions pi-claude-bridge uses",
 		getArgumentCompletions: (prefix) => {
 			const ids = instance().router.state.accounts.map((p) => p.id);
-			const verbs = ["use", "next", "add", "login", "rename", "remove", "refresh", "mode", "switch", "reset"];
+			const verbs = ["list", "usage", "use", "next", "add", "login", "rename", "remove", "refresh", "mode", "switch", "reset"];
 			const words = [
 				...verbs,
 				...["use", "login", "rename", "remove"].flatMap((verb) => ids.map((id) => `${verb} ${id}`)),
@@ -545,7 +545,7 @@ export default function (pi: ExtensionAPI) {
 					if (ownsDir) rmSync(account.configDir!, { recursive: true, force: true });
 					transact(current, () => router.removeAccount(value));
 					ctx.ui.notify(`Removed ${label}.`, "info");
-				} else if (verb === "refresh") {
+				} else if (verb === "refresh" || verb === "usage") {
 					ctx.ui.notify("Reading usage for every account…", "info");
 					const usage = await refreshUsage(current, ctx.cwd);
 					const logins = await checkLogins(current);

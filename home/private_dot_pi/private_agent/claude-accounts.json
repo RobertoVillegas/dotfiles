@@ -1,0 +1,4 @@
+{
+  "mode": "failover",
+  "switchConversations": "ask"
+}

@@ -34,6 +34,9 @@ for skill in "$skills_dir"/*/; do
   name="${skill##*/}"
   [ -f "$skill/SKILL.md" ] || continue
   link="$claude_skills/$name"
+  if [ -L "$link" ] && [ "$(readlink "$link")" = "$skill" ]; then
+    continue
+  fi
   if [ -L "$link" ] || [ ! -e "$link" ]; then
     ln -sfn "$skill" "$link"
   fi

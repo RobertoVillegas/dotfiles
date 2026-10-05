@@ -1,28 +1,14 @@
 # Pi accounts
 
-Two mechanisms decide which account a Pi request uses.
+Pi uses Claude through `pi-claude-bridge`, which runs the unmodified Claude Code
+binary through the Claude Agent SDK; T3's Claude provider works the same way.
+Several Claude subscriptions, such as a personal Pro and one from work, take
+turns through the `claude-accounts` extension below, so every request is still
+Claude Code's.
 
-| Provider in Pi | Extension | Accounts |
-| --- | --- | --- |
-| `pi-claude/*` (Claude via the Agent SDK) | `pi-claude-bridge` + `claude-accounts` | Claude Code config directories |
-| `anthropic*`, `openai-codex*`, `cursor*`, `kimi*`, `qwen*`, `ollama*` | `pi-multi-account` | every slot logged in with Pi's `/login` |
+## Several Claude subscriptions
 
-## Several Claude subscription accounts in Pi
-
-There are two routes, and they differ in who talks to Anthropic:
-
-| Route | Who sends the request | Switching |
-| --- | --- | --- |
-| `pi-claude-bridge` + `claude-accounts` (`pi-claude/*` models) | the unmodified Claude Code binary, through the Claude Agent SDK | `/claude-account`, and automatic on limits |
-| `pi-multi-account` (`anthropic`, `anthropic-account-*` slots) | Pi itself, with the subscription's OAuth token | `/multi-account`, and automatic on limits |
-
-The SDK route is how T3's Claude provider works too. The direct route uses the
-subscription's OAuth token outside Claude Code, while Anthropic's
-[authentication terms](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
-reserve that token for Claude Code and its own apps and allow enforcement
-without notice. Choose knowingly.
-
-**SDK route with several accounts.** The `claude-accounts` extension
+The `claude-accounts` extension
 (`~/.pi/agent/extensions/claude-accounts/`) implements the bridge's
 account-router contract (`kendex.pi.claude-account-router.v1`). Each account is
 a Claude Code config directory, declared in `~/.pi/agent/claude-accounts.json`:
@@ -86,63 +72,25 @@ model. A failed login is retried after ten minutes or on `use`. Cooldowns live i
 machine. Usage figures only appear once Claude Code reports them for an account,
 so `least-used` treats an account without figures as unused.
 
-**Direct route.** In Pi, `/login` → *Use a subscription* → Claude for the first
-account (`anthropic`), then `/multi-account add anthropic` and `/login` again
-with the slot it prints (for example `anthropic-account-2`). Separate Anthropic
-logins cannot be proven to be different people, so check the emails in
-`/multi-account accounts refresh`.
+## Why not pi-multi-account
 
-## pi-multi-account
-
-`pi-multi-account` rotates subscription accounts for Anthropic, Codex (ChatGPT),
-Cursor, Kimi, Qwen, and Ollama when one hits a quota. The dotfiles install the pinned
-package; logging in stays a manual, per-machine step:
-
-```text
-/multi-account add codex     # prints the next free slot, e.g. openai-codex-account-2
-/login                       # Use a subscription → pick that slot
-/multi-account rediscover
-/multi-account status
-```
-
-Slot names come from Pi; do not copy them into scripts or docs. Pi bridges such
-as `pi-claude` and `pi-cursor-sdk` appear under "Other providers" in `status`:
-the extension routes around them but does not rotate them.
-
-### Verify
-
-1. `/multi-account status` lists every logged-in slot in the rotation.
-2. `/multi-account switch <slot>/<model>` (or `/model`) and send a prompt; the
-   footer limits belong to that account.
-3. `/multi-account remove <slot>` takes it out of rotation; logging in again
-   restores it. The other slots keep working.
-4. `/multi-account next` exercises one switch without waiting for a quota error.
-5. With `pi-subagents`, start a child with an explicit model. The parent's model
-   and account must not change: children run with `PI_SUBAGENT_CHILD=1`, where
-   this extension never switches models or queues work.
-
-After re-authenticating a slot, restart older Pi processes: each process keeps
-its access token in memory.
+`pi-multi-account` was installed briefly and removed. Its Claude support sends
+requests from Pi itself with the subscription's OAuth token, imitating Claude
+Code's headers, which Anthropic's
+[authentication terms](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use)
+reserve for Claude Code and its own apps. It did not support the bridge, held
+no accounts here, routed the `cursor` provider through its own loopback proxy,
+and could switch models on errors it read as quota limits, against the
+ask-before-switching rule above. The Pi package script removes it and the
+`models.json` entries and `provider-failover*` files it left.
 
 ## What stays local
 
 | File | Written by | Managed by chezmoi |
 | --- | --- | --- |
+| `~/.pi/agent/claude-accounts.json` | the dotfiles | yes |
+| `~/.pi/agent/claude-accounts-state.json` | `claude-accounts` (cooldowns, usage, conversation accounts) | never |
+| `~/.claude/`, `~/.claude-work/` | Claude Code | never |
 | `~/.pi/agent/auth.json` | Pi `/login` | never |
-| `~/.pi/agent/models.json` | `pi-multi-account` (account aliases) | never |
-| `~/.pi/agent/provider-failover*.json` | `pi-multi-account` (config, cooldowns) | never |
-| `~/.pi/agent/provider-failover-debug.log` | `pi-multi-account` | never |
-| `~/.claude*/` | Claude Code | never |
-| `~/.pi/agent/claude-accounts-state.json` | `claude-accounts` (cooldowns, usage) | never |
 
-`models.json` looks like configuration but is generated: versioning it would
-overwrite the aliases on every apply. `.chezmoiignore` lists these paths so
-`chezmoi add` refuses them.
-
-## Boundaries
-
-- Keep one extension in charge of automatic model selection. In the current set
-  only `pi-multi-account` switches models on its own; `pi-subagents` and
-  `pi-fabric` call `setModel` only when asked to.
-- Pi 1.0 already defaults `retry.provider.maxRetries` to `0`, which is what
-  `pi-multi-account` needs to see a quota error before the SDK retries it.
+`.chezmoiignore` lists these paths so `chezmoi add` refuses them.

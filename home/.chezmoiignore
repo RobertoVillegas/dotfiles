@@ -82,7 +82,6 @@ Library/Preferences
 .pi/agent/auth.json
 .pi/agent/models.json
 .pi/agent/models-store.json
-.pi/agent/provider-failover*
 .pi/agent/sessions
 .claude/.credentials.json
 .claude_*

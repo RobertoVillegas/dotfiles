@@ -31,7 +31,7 @@ client sessions, provider tokens, projects, threads, branches, or worktrees.
 | Git | branches and history |
 | Worktrunk | worktrees |
 | Herdr | independent persistent terminal workflows |
-| Pi packages | Pi extensions, including `pi-subagents` and `pi-multi-account` |
+| Pi packages | Pi extensions, including `pi-subagents` and `pi-claude-bridge` |
 
 ## Version and channel
 
@@ -249,9 +249,8 @@ found on the server's `PATH`) in RPC mode, so Pi keeps its models, extensions,
 skills, `AGENTS.md`, and authentication. Nothing Pi-specific is configured in
 T3 beyond enabling the provider in **Settings → Providers**.
 
-- Models come from Pi's own catalog, including every account alias created by
-  `pi-multi-account`, and the thinking picker shows the levels each model
-  supports. Do not copy model IDs into notes or scripts; `pi --list-models`
+- Models come from Pi's own catalog, and the thinking picker shows the levels
+  each model supports. Do not copy model IDs into notes or scripts; `pi --list-models`
   answers for the installed Pi.
 - Threads use Pi's native session files, so resume, rollback, and forks keep the
   native conversation.
@@ -328,16 +327,15 @@ Each harness owns its authentication; T3 does not unify it.
   instance for it in **Settings → Providers** with that **CLAUDE_CONFIG_DIR**:
 
   ```sh
-  mkdir -p ~/.claude_personal
-  CLAUDE_CONFIG_DIR=~/.claude_personal claude auth login
+  mkdir -p ~/.claude-work
+  CLAUDE_CONFIG_DIR=~/.claude-work claude auth login
   ```
 
   Those directories hold credentials and stay outside chezmoi. A thread can only
   switch between instances that share a config directory.
 - **Pi:** `pi-claude-bridge` uses Claude Code logins through the Agent SDK, and
-  `pi-multi-account` rotates the slots logged in through Pi's `/login`; T3 sees
-  both as Pi models. [Pi accounts](pi-accounts.md) compares the two routes for
-  Claude.
+  the `claude-accounts` extension switches between your Claude subscriptions in
+  Pi threads too ([Pi accounts](pi-accounts.md)).
 - **Codex and OpenCode:** their own login on the devbox.
 
 No credential, `auth.json`, or T3 state belongs in these dotfiles. See

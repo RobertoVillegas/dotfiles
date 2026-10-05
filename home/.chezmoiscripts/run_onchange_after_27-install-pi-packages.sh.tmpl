@@ -34,12 +34,8 @@ packages=(
   npm:pi-cursor-sdk@0.4.0
   npm:@estebanforge/pi-antigravity-bridge@1.7.8
   npm:pi-service-tier@0.4.0
-  # Rotates Claude, Codex and other subscription accounts on quota limits. It
-  # reads the slots created with /login from auth.json and writes its own
-  # models.json aliases and provider-failover*.json state; none of that is
-  # managed here. Children marked PI_SUBAGENT_CHILD by pi-subagents stay passive.
-  # docs/pi-accounts.md compares it with pi-claude-bridge for Claude.
-  npm:pi-multi-account@1.24.0
+  # Several Claude subscriptions go through pi-claude-bridge and the
+  # claude-accounts extension in ~/.pi/agent/extensions; see docs/pi-accounts.md.
 )
 
 # Known predecessors are removed deliberately. Pi credentials, sessions and
@@ -53,6 +49,11 @@ obsolete_packages=(
   npm:pi-claude-bridge
   npm:pi-cursor-oauth
   npm:@tian.zuo/pi-antigravity
+  # Replaced by ~/.pi/agent/extensions/claude-accounts, which rotates Claude
+  # through Claude Code. It held no accounts, rewired the cursor provider
+  # through its own loopback proxy, and could switch models on errors it read
+  # as quota, against the ask-before-switching rule.
+  npm:pi-multi-account
 )
 
 settings="$HOME/.pi/agent/settings.json"
@@ -73,6 +74,35 @@ for src in "${obsolete_packages[@]}"; do
     pi remove "$entry"
   fi
 done
+
+# pi-multi-account leaves files behind. Its models.json entries point at its
+# loopback proxy, which is gone once it is removed, so drop only those: the
+# numbered "-account-N" aliases and any provider routed through 127.0.0.1.
+# Pi's own models and anything else in the file stay.
+models="$HOME/.pi/agent/models.json"
+if [ -z "$(installed_entry npm:pi-multi-account)" ] &&
+  [ -f "$HOME/.pi/agent/provider-failover.json" ]; then
+  if [ -f "$models" ]; then
+    models_tmp="$(mktemp)"
+    jq '
+      if (.providers | type) == "object" then
+        .providers |= with_entries(select(
+          (.key | test("-account-[0-9]+$") | not) and
+          ((.value.baseUrl // "") | test("^https?://(127\\.0\\.0\\.1|localhost)[:/]") | not)
+        ))
+      else . end
+    ' "$models" >"$models_tmp"
+    if jq -e '(.providers // {} | length) == 0 and (del(.providers) | length) == 0' "$models_tmp" >/dev/null; then
+      rm -f "$models" "$models_tmp"
+    else
+      chmod 600 "$models_tmp"
+      mv "$models_tmp" "$models"
+    fi
+  fi
+  rm -f "$HOME/.pi/agent/provider-failover.json" \
+    "$HOME/.pi/agent/provider-failover-state.json" \
+    "$HOME/.pi/agent/provider-failover-debug.log"
+fi
 
 for src in "${packages[@]}"; do
   if [ -f "$settings" ] &&

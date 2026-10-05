@@ -31,7 +31,8 @@ export PATH="$MISE_DATA_DIR/shims:$PATH"
 # forward on its own between applies. Reinstalling on any mismatch would drag it
 # back down every night only for it to update itself again. Set DISABLE_AUTOUPDATER
 # in ~/.claude/settings.json if this should become a real pin.
-claude_version="2.1.236"
+# T3 Code 0.0.46 supports Claude Code >= 2.1.280; older builds degrade.
+claude_version="2.1.289"
 current_claude=""
 if command -v claude >/dev/null 2>&1; then
   # `claude --version` prints "<version> (Claude Code)".
@@ -55,7 +56,8 @@ fi
 # load-bearing: without it the installer appends `export PATH=...` to ~/.zshrc,
 # which chezmoi manages, so the next apply would revert it and leave opencode
 # off PATH.
-opencode_version="2.0.12"
+# T3 Code 0.0.46 marks OpenCode 2.0.0-2.0.17 unsupported.
+opencode_version="2.0.23"
 current_opencode=""
 if [ -x "$HOME/.opencode/bin/opencode" ]; then
   # `opencode --version` prints "opencode v<version>".

@@ -29,16 +29,20 @@ flatc = "25.12.19"
 # hand when an upgrade is actually wanted.
 herdr = "0.9.3"
 worktrunk = "0.77.0"
-"npm:@earendil-works/pi-coding-agent" = "1.0.0"
+"npm:@earendil-works/pi-coding-agent" = "1.0.3"
 "npm:@fission-ai/openspec" = "1.13.0"
-"npm:@openai/codex" = "0.154.0"
+"npm:@openai/codex" = "0.160.0"
 # Shared QMD executable; Pi and Hermes keep separate named collections.
+# Third-party Agent Skills; the manifest is ~/.agents/agents.toml.
+"npm:@sentry/dotagents" = "3.3.0"
 "npm:@tobilu/qmd" = { version = "2.8.3", allow_builds = ["node-llama-cpp"] }
 "npm:@vercel/before-and-after" = "0.0.4"
 "npm:agent-browser" = { version = "0.38.1", allow_builds = ["agent-browser"] }
 "npm:dev3000" = "0.0.178"
 "npm:portless" = "0.15.6"
-"npm:t3" = { version = "0.0.40", npm_args = "--legacy-peer-deps" }
+# Nightly on purpose: Orchestrator V2 (Pi provider, delegate_task) is not in a
+# stable release yet. Keep it equal to the T3 Code nightly desktop app.
+"npm:t3" = { version = "0.0.46-nightly.20261005.2667", npm_args = "--legacy-peer-deps" }
 {{- end }}
 
 [settings]
@@ -54,3 +58,12 @@ lockfile_platforms = ["macos-arm64", "linux-x64"]
 # Spelled out rather than left to mise's default, which `mise settings get`
 # reports unset.
 minimum_release_age = "4h"
+# First-party agent CLIs whose vendors already hold full access to this machine
+# skip the window: T3's provider compatibility table moves with each release,
+# and Claude Code and OpenCode update themselves outside mise anyway. Every
+# other tool, including third-party extensions, keeps the quarantine.
+minimum_release_age_excludes = [
+  "npm:@openai/codex",
+  "npm:@earendil-works/pi-coding-agent",
+  "npm:t3",
+]

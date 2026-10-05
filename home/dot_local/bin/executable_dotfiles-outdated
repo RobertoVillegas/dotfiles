@@ -142,6 +142,16 @@ if command -v mise >/dev/null 2>&1 && [ -f "$mise_config_file" ]; then
 	# report() keeps would be discarded.
 	while read -r tool pinned; do
 		[ -n "$tool" ] || continue
+		# A prerelease pin follows its own channel: `mise latest` answers with the
+		# stable release and would call a newer nightly "adelantado al pin".
+		case "$tool:$pinned" in
+		npm:*-nightly.*)
+			package="${tool#npm:}"
+			report "$tool" "$pinned" "$(npm view "$package" dist-tags.nightly 2>/dev/null)" \
+				"$mise_config"
+			continue
+			;;
+		esac
 		report "$tool" "$pinned" "$(mise latest "$tool" 2>/dev/null)" "$mise_config"
 	done <<EOF
 $mise_tools

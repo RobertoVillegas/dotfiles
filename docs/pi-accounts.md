@@ -45,6 +45,7 @@ Then, in any Pi conversation on a `pi-claude/*` model:
 /claude-account use work     # this conversation from the next turn, and new ones by default
 /claude-account next         # the other account
 /claude-account mode least-used   # for this Pi process; the file keeps the default
+/claude-account switch auto  # let conversations move on their own (this process)
 /claude-account reset        # forget cooldowns and failed logins
 ```
 
@@ -52,18 +53,31 @@ The status bar shows the active account. A switch mid-conversation is safe: the
 bridge rebuilds the Claude Code session from Pi's history under the new account.
 It is not free, though: the prompt cache belongs to the account, so the first
 turn after a switch pays for the whole context again. That is why a conversation
-stays on its account until you switch it or the account runs out, and why
-`round-robin` alternates conversations, not turns.
+stays on its account until you approve a switch, and why `round-robin`
+alternates conversations, not turns.
 
 Log in on the machine that runs Pi, from its usual network. Logins and traffic
 from datacenter IPs or several machines at once are what draws scrutiny, so the
 devboxes at home are fine and a cloud VPS is not.
 
-| Mode | New conversation gets | When an account hits its limit |
-| --- | --- | --- |
-| `failover` (default) | the preferred account | the same turn moves to the other one |
-| `round-robin` | the next account in turn | same |
-| `least-used` | the lowest 5-hour/7-day usage Claude Code reported | same |
+| Mode | A new conversation gets |
+| --- | --- |
+| `failover` (default) | the preferred account, or the next available one |
+| `round-robin` | the next account in turn |
+| `least-used` | the lowest 5-hour/7-day usage Claude Code reported |
+
+**A conversation never changes account on its own.** When its account reaches a
+limit or its login fails, the turn stops with the reason, and once Pi settles it
+asks whether to continue on the other account. Declining leaves the conversation
+as it is, so you can start a new one instead; `/claude-account use <id>` makes the
+same switch later. Two cases move without asking: a conversation that has not
+completed a turn yet (it has no history to resend), and every conversation when
+`"switchConversations": "auto"` is set in `claude-accounts.json` or with
+`/claude-account switch auto`. In `auto`, the bridge retries the failed turn on
+the other account straight away.
+
+Pi's background calls without a conversation, such as compaction summaries,
+are routed like new conversations.
 
 A limited account stays out until the reset time Claude Code reports (one hour
 without one). A limit on one model family, such as weekly Opus, only blocks that

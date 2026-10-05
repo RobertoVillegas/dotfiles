@@ -9,7 +9,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { AccountRouter, emptyState, MODES, type Config, type Mode, type State } from "./router.ts";
+import { AccountRouter, emptyState, MODES, type Config, type Mode, type State, type SwitchPolicy } from "./router.ts";
 
 const ROUTER_SYMBOL = Symbol.for("kendex.pi.claude-account-router.v1");
 // Keeps one router per process across /reload, so conversation pins survive.
@@ -31,6 +31,8 @@ function loadConfig(): Config | undefined {
 	if (!existsSync(configPath())) return undefined;
 	const raw = JSON.parse(readFileSync(configPath(), "utf8")) as Partial<Config>;
 	const mode: Mode = MODES.includes(raw.mode as Mode) ? (raw.mode as Mode) : "failover";
+	// Anything but an explicit "auto" asks before moving a conversation.
+	const switchConversations: SwitchPolicy = raw.switchConversations === "auto" ? "auto" : "ask";
 	const profiles = (raw.profiles ?? [])
 		.filter((p) => p && typeof p.id === "string" && p.id.trim())
 		.map((p) => {
@@ -39,7 +41,7 @@ function loadConfig(): Config | undefined {
 			const isDefault = configDir === join(homedir(), ".claude");
 			return { id: p.id, label: p.label, ...(configDir && !isDefault ? { configDir } : {}) };
 		});
-	return profiles.length > 0 ? { mode, profiles } : undefined;
+	return profiles.length > 0 ? { mode, switchConversations, profiles } : undefined;
 }
 
 /** State is shared with every other Pi process on this machine through one
@@ -51,7 +53,8 @@ class StateFile {
 	read(): State {
 		try {
 			this.mtimeMs = statSync(this.path).mtimeMs;
-			return { ...emptyState(), ...(JSON.parse(readFileSync(this.path, "utf8")) as Partial<State>) };
+			const saved = JSON.parse(readFileSync(this.path, "utf8")) as Partial<State>;
+			return { ...emptyState(), ...saved, sessions: saved.sessions ?? {} };
 		} catch {
 			return emptyState();
 		}
@@ -81,20 +84,34 @@ class StateFile {
 interface Instance {
 	router: AccountRouter;
 	file: StateFile;
+	configMtimeMs: number;
 }
 
+const configMtime = () => {
+	try {
+		return statSync(configPath()).mtimeMs;
+	} catch {
+		return 0;
+	}
+};
+
+/** Reloads the config only when its file changes, so /claude-account mode
+ *  and switch hold for the rest of the process. */
 function instance(): Instance | undefined {
 	const host = globalThis as Record<symbol, unknown>;
 	const existing = host[INSTANCE_SYMBOL] as Instance | undefined;
+	const mtime = configMtime();
+	if (existing && existing.configMtimeMs === mtime) return existing;
 	const config = loadConfig();
 	if (!config) return existing;
 	if (existing) {
 		existing.router.config = config;
+		existing.configMtimeMs = mtime;
 		return existing;
 	}
 	const file = new StateFile(statePath());
 	const router = new AccountRouter(config, file.read(), Date.now, (state) => file.write(state));
-	const created = { router, file };
+	const created = { router, file, configMtimeMs: mtime };
 	host[INSTANCE_SYMBOL] = created;
 	return created;
 }
@@ -122,7 +139,9 @@ function contract({ router, file }: Instance) {
 
 function describe(router: AccountRouter, modelId: string, sessionId?: string): string {
 	const active = router.current(modelId, sessionId)?.profileId;
-	const lines = [`Claude accounts · mode ${router.config.mode} · model ${modelId}`];
+	const lines = [
+		`Claude accounts · mode ${router.config.mode} · conversations ${router.config.switchConversations === "auto" ? "switch automatically" : "ask before switching"} · model ${modelId}`,
+	];
 	for (const p of router.config.profiles) {
 		const id = router.state.identity[p.id];
 		const usage = router.state.usage[p.id];
@@ -141,7 +160,7 @@ function describe(router: AccountRouter, modelId: string, sessionId?: string): s
 				` · ${p.configDir ?? "~/.claude"}`,
 		);
 	}
-	lines.push("Use: /claude-account use <id> | next | mode <failover|round-robin|least-used> | reset");
+	lines.push("Use: /claude-account use <id> | next | mode <failover|round-robin|least-used> | switch <ask|auto> | reset");
 	return lines.join("\n");
 }
 
@@ -164,11 +183,33 @@ export default function (pi: ExtensionAPI) {
 	pi.on("model_select", (_event, ctx) => showStatus(ctx, instance()));
 	pi.on("agent_end", (_event, ctx) => showStatus(ctx, instance()));
 
+	// A conversation whose account ran out stops instead of moving. Once Pi has
+	// settled, offer the switch; declining leaves the conversation as it is.
+	pi.on("agent_settled", async (_event, ctx) => {
+		const router = instance()?.router;
+		const sessionId = ctx.sessionManager.getSessionId();
+		const pending = router?.takePending(sessionId);
+		if (!router || !pending?.to || !ctx.hasUI) return;
+		const target = router.label(pending.to);
+		const ok = await ctx.ui.confirm(
+			`Continue on ${target}?`,
+			`${pending.reason}. Continuing here resends this conversation's context to ${target} without cache, ` +
+				"so the first turn costs more. Decline to keep it as it is and start a new conversation instead.",
+		);
+		if (!ok) return;
+		router.use(pending.to, sessionId);
+		showStatus(ctx, instance());
+		pi.sendUserMessage("Continue where you left off.");
+	});
+
 	pi.registerCommand("claude-account", {
 		description: "Show or switch the Claude subscription pi-claude-bridge uses",
 		getArgumentCompletions: (prefix) => {
 			const ids = instance()?.router.config.profiles.map((p) => p.id) ?? [];
-			const words = ["use", "next", "mode", "reset", ...ids.map((id) => `use ${id}`), ...MODES.map((m) => `mode ${m}`)];
+			const words = [
+				"use", "next", "mode", "switch", "reset",
+				...ids.map((id) => `use ${id}`), ...MODES.map((m) => `mode ${m}`), "switch ask", "switch auto",
+			];
 			return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
 		},
 		handler: async (args, ctx) => {
@@ -193,6 +234,14 @@ export default function (pi: ExtensionAPI) {
 					// For this process; the file in the dotfiles keeps the default.
 					router.config.mode = value as Mode;
 					ctx.ui.notify(`Account mode: ${value} (until Pi restarts).`, "info");
+				} else if (verb === "switch" && (value === "ask" || value === "auto")) {
+					router.config.switchConversations = value;
+					ctx.ui.notify(
+						value === "auto"
+							? "Conversations now move to another account on their own (until Pi restarts)."
+							: "Conversations now ask before moving to another account.",
+						"info",
+					);
 				} else if (verb === "reset") {
 					router.reset();
 					ctx.ui.notify("Cleared cooldowns and login flags.", "info");

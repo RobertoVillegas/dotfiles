@@ -9,6 +9,11 @@
 export type Mode = "failover" | "round-robin" | "least-used";
 export const MODES: readonly Mode[] = ["failover", "round-robin", "least-used"];
 
+/** What a conversation with history does when its account cannot serve it.
+ *  "ask" stops the turn and leaves the switch to the user, because the first
+ *  turn on another account resends the whole context without cache. */
+export type SwitchPolicy = "ask" | "auto";
+
 export interface ProfileConfig {
 	id: string;
 	label?: string;
@@ -18,6 +23,7 @@ export interface ProfileConfig {
 
 export interface Config {
 	mode: Mode;
+	switchConversations: SwitchPolicy;
 	profiles: ProfileConfig[];
 }
 
@@ -34,6 +40,14 @@ export interface Window {
 	resetsAt: number | null;
 }
 
+export interface SessionPin {
+	profile: string;
+	/** True once a turn succeeded: from then on the conversation has history
+	 *  and cache on this account, so leaving it needs the user's approval. */
+	used: boolean;
+	at: number;
+}
+
 /** Shared across Pi processes through the state file; plain JSON only. */
 export interface State {
 	/** Profile chosen by hand; leads the order for new conversations. */
@@ -42,14 +56,17 @@ export interface State {
 	lastAssigned?: string;
 	/** Cooldown deadlines, keyed by profile id or `${profileId}|${modelId}`. */
 	cooldowns: Record<string, number>;
-	/** Profiles whose login failed; cleared by the next success. */
+	/** When each profile's login last failed. */
 	needsLogin: Record<string, number>;
 	identity: Record<string, { email?: string; subscriptionType?: string }>;
 	usage: Record<string, { fiveHour?: Window; sevenDay?: Window; at: number }>;
+	/** Conversation → account. Persisted so a conversation reopened after a
+	 *  restart keeps its account instead of being routed as a new one. */
+	sessions: Record<string, SessionPin>;
 }
 
 export function emptyState(): State {
-	return { cooldowns: {}, needsLogin: {}, identity: {}, usage: {} };
+	return { cooldowns: {}, needsLogin: {}, identity: {}, usage: {}, sessions: {} };
 }
 
 /** Without reset metadata, how long each failure keeps a profile out. */
@@ -65,6 +82,8 @@ const DEFAULT_RATE_LIMIT_MS = 60 * 60_000;
 /** A failed login is retried after this, so logging in later is picked up
  *  without a reset: an account that is never tried can never succeed. */
 const LOGIN_RETRY_MS = 10 * 60_000;
+/** Conversations untouched for this long are forgotten. */
+const SESSION_TTL_MS = 30 * 24 * 3600_000;
 
 /** A rate-limit type naming a model family only blocks that model. */
 const MODEL_SCOPED = /opus|sonnet|haiku|fable/i;
@@ -77,6 +96,25 @@ export class NoProfileAvailable extends Error {
 		this.name = "NoProfileAvailable";
 		if (resetAtMs !== undefined) this.resetAtMs = resetAtMs;
 	}
+}
+
+/** The conversation's account cannot serve it and the user has to decide. */
+export class SwitchNeedsApproval extends NoProfileAvailable {
+	readonly from: string;
+	readonly to: string | undefined;
+	constructor(message: string, from: string, to: string | undefined, resetAtMs?: number) {
+		super(message, resetAtMs);
+		this.name = "SwitchNeedsApproval";
+		this.rateLimitType = "account";
+		this.from = from;
+		this.to = to;
+	}
+}
+
+export interface PendingSwitch {
+	from: string;
+	to?: string;
+	reason: string;
 }
 
 export function toMs(value: unknown): number | undefined {
@@ -94,13 +132,11 @@ export function toMs(value: unknown): number | undefined {
 }
 
 export class AccountRouter {
-	/** Conversation → profile. A conversation stays on its account until the
-	 *  user switches it or the account fails. In memory: a restarted Pi
-	 *  re-derives it from the bridge's stored profile id on the first turn. */
-	readonly sessions = new Map<string, string>();
-
 	config: Config;
 	state: State;
+	/** Switches waiting for the user, by conversation. Process-local: the
+	 *  window that hit the limit is the one that asks. */
+	readonly pending = new Map<string, PendingSwitch>();
 	private readonly now: () => number;
 	/** Called after any change that other Pi processes should see. */
 	private readonly persist: (state: State) => void;
@@ -116,6 +152,10 @@ export class AccountRouter {
 
 	profile(id: string): ProfileConfig | undefined {
 		return this.config.profiles.find((p) => p.id === id);
+	}
+
+	label(id: string): string {
+		return this.profile(id)?.label ?? id;
 	}
 
 	route(id: string): Route {
@@ -140,6 +180,22 @@ export class AccountRouter {
 		return this.blockedUntil(id, modelId) === 0 && !this.needsLogin(id);
 	}
 
+	pin(sessionId: string): SessionPin | undefined {
+		const pin = this.state.sessions[sessionId];
+		return pin && this.profile(pin.profile) ? pin : undefined;
+	}
+
+	private setPin(sessionId: string, profile: string, used: boolean): void {
+		const previous = this.state.sessions[sessionId];
+		if (previous?.profile === profile && previous.used === used) return;
+		this.state.sessions[sessionId] = { profile, used, at: this.now() };
+		const cutoff = this.now() - SESSION_TTL_MS;
+		for (const [id, pin] of Object.entries(this.state.sessions)) {
+			if (pin.at < cutoff) delete this.state.sessions[id];
+		}
+		this.persist(this.state);
+	}
+
 	/** Profiles in the order a new conversation should try them. */
 	order(): string[] {
 		const ids = this.config.profiles.map((p) => p.id);
@@ -160,37 +216,55 @@ export class AccountRouter {
 		return preferred && ids.includes(preferred) ? [preferred, ...ids.filter((i) => i !== preferred)] : ids;
 	}
 
+	/** Why the profile cannot serve this model right now. */
+	reason(id: string, modelId: string): string {
+		if (this.needsLogin(id)) return `${this.label(id)} needs to log in again`;
+		const until = this.blockedUntil(id, modelId);
+		return until
+			? `${this.label(id)} reached its limit until ${new Date(until).toLocaleString()}`
+			: `${this.label(id)} could not answer`;
+	}
+
 	acquire(input: { modelId: string; sessionId?: string; excludedProfileIds?: string[]; forceRerank?: boolean }): Route {
 		const excluded = new Set(input.excludedProfileIds ?? []);
 		const usable = (id: string) => !excluded.has(id) && this.available(id, input.modelId);
+		const pin = input.sessionId ? this.pin(input.sessionId) : undefined;
 
-		const pinned = input.sessionId ? this.sessions.get(input.sessionId) : undefined;
-		if (pinned && this.profile(pinned) && usable(pinned) && !input.forceRerank) return this.route(pinned);
+		if (pin && usable(pin.profile) && !input.forceRerank) return this.route(pin.profile);
 
-		const chosen = this.order().find(usable);
+		const chosen = pin ? this.order().find((id) => id !== pin.profile && usable(id)) ?? (usable(pin.profile) ? pin.profile : undefined) : this.order().find(usable);
+
+		// A conversation with history stays on its account unless allowed.
+		if (pin?.used && chosen !== pin.profile && this.config.switchConversations === "ask" && input.sessionId) {
+			const reason = this.reason(pin.profile, input.modelId);
+			this.pending.set(input.sessionId, { from: pin.profile, to: chosen, reason });
+			const advice = chosen
+				? `Run /claude-account use ${chosen} to continue this conversation on ${this.label(chosen)}, or start a new one.`
+				: "No other account is available either.";
+			const until = this.blockedUntil(pin.profile, input.modelId) || undefined;
+			throw new SwitchNeedsApproval(`${reason}. ${advice}`, pin.profile, chosen, until);
+		}
+
 		if (!chosen) {
 			const resets = this.config.profiles
 				.map((p) => this.blockedUntil(p.id, input.modelId))
 				.filter((t) => t > 0);
 			const resetAtMs = resets.length ? Math.min(...resets) : undefined;
-			const when = resetAtMs ? ` until ${new Date(resetAtMs).toISOString()}` : "";
+			const when = resetAtMs ? ` until ${new Date(resetAtMs).toLocaleString()}` : "";
 			throw new NoProfileAvailable(`No Claude account is available${when}. /claude-account shows why.`, resetAtMs);
 		}
 		if (input.sessionId) {
 			// A new conversation advances the round-robin cursor; a failover
 			// inside an existing one does not.
-			if (!pinned && this.config.mode === "round-robin") {
-				this.state.lastAssigned = chosen;
-				this.persist(this.state);
-			}
-			this.sessions.set(input.sessionId, chosen);
+			if (!pin && this.config.mode === "round-robin") this.state.lastAssigned = chosen;
+			this.setPin(input.sessionId, chosen, pin?.used ?? false);
 		}
 		return this.route(chosen);
 	}
 
 	current(modelId: string, sessionId?: string): Route | undefined {
-		const pinned = sessionId ? this.sessions.get(sessionId) : undefined;
-		if (pinned && this.profile(pinned)) return this.route(pinned);
+		const pin = sessionId ? this.pin(sessionId) : undefined;
+		if (pin) return this.route(pin.profile);
 		const next = this.order().find((id) => this.available(id, modelId));
 		return next ? this.route(next) : undefined;
 	}
@@ -201,7 +275,10 @@ export class AccountRouter {
 		this.state.preferred = id;
 		// An explicit choice is also a retry: the user may have just logged in.
 		delete this.state.needsLogin[id];
-		if (sessionId) this.sessions.set(sessionId, id);
+		if (sessionId) {
+			this.pending.delete(sessionId);
+			this.setPin(sessionId, id, this.pin(sessionId)?.used ?? false);
+		}
 		this.persist(this.state);
 		return route;
 	}
@@ -212,6 +289,13 @@ export class AccountRouter {
 		const current = this.current(modelId, sessionId)?.profileId;
 		const start = current ? ids.indexOf(current) : -1;
 		return this.use(ids[(start + 1) % ids.length]!, sessionId);
+	}
+
+	/** The switch this conversation is waiting on, consumed once. */
+	takePending(sessionId: string): PendingSwitch | undefined {
+		const pending = this.pending.get(sessionId);
+		this.pending.delete(sessionId);
+		return pending;
 	}
 
 	recordRateLimit(id: string, info: Record<string, unknown> | undefined, modelId: string): number {
@@ -236,7 +320,7 @@ export class AccountRouter {
 	}
 
 	recordSuccess(id: string, sessionId?: string): void {
-		if (sessionId) this.sessions.set(sessionId, id);
+		if (sessionId) this.setPin(sessionId, id, true);
 		if (this.state.needsLogin[id]) {
 			delete this.state.needsLogin[id];
 			this.persist(this.state);

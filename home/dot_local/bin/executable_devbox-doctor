@@ -196,6 +196,12 @@ elif command -v tailscale >/dev/null 2>&1 && tailscale status >/dev/null 2>&1; t
       warn "Tailscale Serve routes without a live backend (devbox-serve-gc withdraws them)"
       printf '%s\n' "$dead_routes"
     fi
+    if leases="$(devbox-serve-gc --audit 2>&1)"; then
+      pass "Every live Tailscale Serve route has an owner and none is older than a day"
+    else
+      warn "Unowned or day-old dev leases (stop them, or list a shared port in serve-keep)"
+      printf '%s\n' "$leases"
+    fi
   else
     warn "devbox-serve-gc is not installed; leaked routes are never withdrawn"
   fi

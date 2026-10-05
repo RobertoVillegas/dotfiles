@@ -264,7 +264,7 @@ interface UsageRefresh {
 
 /** Reads identity and 5-hour/7-day usage for each logged-in account through
  *  the bridge's local /usage probe, which sends no model request. */
-async function refreshUsage(inst: Instance, cwd: string): Promise<UsageRefresh> {
+async function refreshUsage(inst: Instance, cwd: string, force = false): Promise<UsageRefresh> {
 	const result: UsageRefresh = { updated: 0, skipped: 0, unavailable: 0 };
 	const host = (globalThis as Record<symbol, unknown>)[ACCOUNT_HOST_SYMBOL] as AccountHost | undefined;
 	if (host?.version !== 1) return result;
@@ -272,7 +272,7 @@ async function refreshUsage(inst: Instance, cwd: string): Promise<UsageRefresh> 
 	const due = inst.router.state.accounts.filter((p) => {
 		if (p.loggedIn === false) return false;
 		const checked = inst.router.state.usageCheckedAt?.[p.id] ?? 0;
-		if (now - checked < USAGE_MIN_INTERVAL_MS) {
+		if (!force && now - checked < USAGE_MIN_INTERVAL_MS) {
 			result.skipped++;
 			return false;
 		}
@@ -290,8 +290,16 @@ async function refreshUsage(inst: Instance, cwd: string): Promise<UsageRefresh> 
 			transact(inst, () => {
 				if (probe.identity?.email) inst.router.recordIdentity(p.id, probe.identity);
 				if (probe.usage) inst.router.recordUsage(p.id, probe.usage);
-				if (inst.router.state.usage[p.id]?.at !== before) result.updated++;
-				else result.unavailable++;
+				const updated = inst.router.state.usage[p.id]?.at !== before;
+				inst.router.state.usageUnavailable ??= {};
+				if (updated) {
+					result.updated++;
+					delete inst.router.state.usageUnavailable[p.id];
+				} else {
+					result.unavailable++;
+					inst.router.state.usageUnavailable[p.id] = true;
+				}
+				inst.file.write(inst.router.state);
 			});
 		}),
 	);
@@ -344,7 +352,11 @@ function describe(router: AccountRouter, modelId: string, sessionId: string | un
 		const who = loggedOut ? "" : `${id?.email ? ` <${id.email}>` : ""}${id?.subscriptionType ? ` (${id.subscriptionType})` : ""}`;
 		lines.push(
 			`${p.id === active ? "▶" : " "} ${p.id} — ${p.label ?? p.id}${who}` +
-				(loggedOut ? "" : ` · 5h ${pct(usage?.fiveHour)} · 7d ${pct(usage?.sevenDay)}${age(usage?.at)}`) +
+				(loggedOut
+					? ""
+					: router.state.usageUnavailable?.[p.id] && !usage
+						? " · usage: Anthropic gives no figures for this account"
+						: ` · 5h ${pct(usage?.fiveHour)} · 7d ${pct(usage?.sevenDay)}${age(usage?.at)}`) +
 				`${flags.length ? ` · ${flags.join(", ")}` : ""}`,
 		);
 	}
@@ -546,13 +558,11 @@ export default function (pi: ExtensionAPI) {
 					transact(current, () => router.removeAccount(value));
 					ctx.ui.notify(`Removed ${label}.`, "info");
 				} else if (verb === "refresh" || verb === "usage") {
+					// Asked for explicitly: read now, whatever the automatic spacing says.
 					ctx.ui.notify("Reading usage for every account…", "info");
-					const usage = await refreshUsage(current, ctx.cwd);
+					const usage = await refreshUsage(current, ctx.cwd, true);
 					const logins = await checkLogins(current);
-					const notes = [
-						usage.unavailable ? `${usage.unavailable} returned no figures right now (Anthropic limits how often usage can be read)` : "",
-						usage.skipped ? `${usage.skipped} read less than 10 min ago, kept as is` : "",
-					].filter(Boolean);
+					const notes = [usage.unavailable ? `${usage.unavailable} returned no figures from Anthropic` : ""].filter(Boolean);
 					ctx.ui.notify(`${describe(router, modelId, sessionId, logins)}${notes.length ? `\n(${notes.join("; ")})` : ""}`, "info");
 				} else if (verb === "mode" && MODES.includes(value as Mode)) {
 					// For this process; the file in the dotfiles keeps the default.
@@ -571,6 +581,8 @@ export default function (pi: ExtensionAPI) {
 					ctx.ui.notify("Cleared cooldowns and login flags.", "info");
 				} else {
 					if (current.file.changed()) router.state = current.file.read();
+					// Listing refreshes figures older than ten minutes first.
+					await refreshUsage(current, ctx.cwd);
 					const logins = await checkLogins(current);
 					ctx.ui.notify(describe(router, modelId, sessionId, logins), "info");
 				}

@@ -72,6 +72,9 @@ export interface State {
 	/** When each account's usage was last requested, answered or not.
 	 *  Anthropic throttles the usage endpoint, so reads are spaced out. */
 	usageCheckedAt?: Record<string, number>;
+	/** Accounts whose last usage read came back without figures; Anthropic
+	 *  gives none for some plans (a Team seat here). */
+	usageUnavailable?: Record<string, boolean>;
 	/** Conversation → account. Persisted so a conversation reopened after a
 	 *  restart keeps its account instead of being routed as a new one. */
 	sessions: Record<string, SessionPin>;
@@ -350,6 +353,7 @@ export class AccountRouter {
 	}
 
 	recordRateLimit(id: string, info: Record<string, unknown> | undefined, modelId: string): number {
+		this.recordWindows(id, info?.unifiedWindows);
 		const type = String(info?.rateLimitType ?? info?.rate_limit_type ?? info?.type ?? "");
 		const reset = toMs(info?.resetsAt ?? info?.resets_at ?? info?.resetAt ?? info?.reset_at);
 		const until = reset && reset > this.now() ? reset : this.now() + DEFAULT_RATE_LIMIT_MS;
@@ -382,6 +386,26 @@ export class AccountRouter {
 
 	recordIdentity(id: string, identity: { email?: string; subscriptionType?: string }): void {
 		this.state.identity[id] = { email: identity.email, subscriptionType: identity.subscriptionType };
+		this.persist(this.state);
+	}
+
+	/** Usage from a rate-limit event's `unifiedWindows`, where utilization is a
+	 *  fraction (1 = the window is used up). Claude Code sends these with every
+	 *  rejection, so an account the usage endpoint gives no figures for still
+	 *  shows where it stands. */
+	recordWindows(id: string, windows: unknown): void {
+		const w = windows as Record<string, { utilization?: unknown; resetsAt?: unknown } | undefined> | undefined;
+		if (!w || typeof w !== "object") return;
+		const window = (x: { utilization?: unknown; resetsAt?: unknown } | undefined): Window | undefined => {
+			if (!x || typeof x.utilization !== "number") return undefined;
+			const pct = x.utilization <= 1 ? x.utilization * 100 : x.utilization;
+			return { utilization: Math.min(100, Math.max(0, pct)), resetsAt: toMs(x.resetsAt) ?? null };
+		};
+		const fiveHour = window(w.five_hour);
+		const sevenDay = window(w.seven_day);
+		if (!fiveHour && !sevenDay) return;
+		this.state.usage[id] = { fiveHour, sevenDay, at: this.now() };
+		if (this.state.usageUnavailable) delete this.state.usageUnavailable[id];
 		this.persist(this.state);
 	}
 

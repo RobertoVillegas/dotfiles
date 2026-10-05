@@ -14,3 +14,8 @@
 .local/bin/python
 .local/bin/python3
 {{ end }}
+
+# claude-accounts was reverted from main; remove what earlier applies left.
+.pi/agent/extensions/claude-accounts
+.pi/agent/claude-accounts.json
+.pi/agent/claude-accounts-state.json

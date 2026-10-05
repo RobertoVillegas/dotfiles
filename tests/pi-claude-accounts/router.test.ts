@@ -9,7 +9,7 @@ import {
 	type Config,
 	type SwitchPolicy,
 	type Mode,
-} from "../../home/private_dot_pi/private_agent/extensions/claude-accounts/router.ts";
+} from "../../home/private_dot_pi/agent/extensions/claude-accounts/router.ts";
 
 const OPUS = "claude-opus-4-8";
 

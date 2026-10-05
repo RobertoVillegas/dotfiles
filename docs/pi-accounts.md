@@ -30,6 +30,7 @@ Then, in any Pi conversation on a `pi-claude/*` model:
 /claude-account              # accounts, identity, usage, cooldowns
 /claude-account use work     # this conversation from the next turn, and new ones by default
 /claude-account next         # the other account
+/claude-account refresh      # read each account's 5-hour/7-day usage (local /usage, no model request)
 /claude-account mode least-used   # for this Pi process; the file keeps the default
 /claude-account switch auto  # let conversations move on their own (this process)
 /claude-account reset        # forget cooldowns and failed logins
@@ -62,15 +63,29 @@ completed a turn yet (it has no history to resend), and every conversation when
 `/claude-account switch auto`. In `auto`, the bridge retries the failed turn on
 the other account straight away.
 
-Pi's background calls without a conversation, such as compaction summaries,
-are routed like new conversations.
+The rule also holds when the limit arrives in the middle of an answer: the
+bridge cannot retry that turn, so it ends with an error, and the same question
+appears once Pi settles.
+
+Work done on behalf of a conversation stays on its account and under the same
+rule: compaction summaries and other background calls in that Pi process, and
+`pi-subagents` children (they find the parent through
+`PI_SUBAGENT_PARENT_SESSION`, or `PI_CLAUDE_ACCOUNTS_PROFILE` otherwise). A
+child whose account runs out fails instead of spending the other subscription.
 
 A limited account stays out until the reset time Claude Code reports (one hour
 without one). A limit on one model family, such as weekly Opus, only blocks that
 model. A failed login is retried after ten minutes or on `use`. Cooldowns live in
 `~/.pi/agent/claude-accounts-state.json`, shared by every Pi window on the
-machine. Usage figures only appear once Claude Code reports them for an account,
-so `least-used` treats an account without figures as unused.
+machine; each change is a locked read-modify-write, so two windows cannot drop
+each other's updates. Usage figures only appear once Claude Code reports them for an account,
+so `least-used` treats an account without figures as unused; in that mode the
+figures are refreshed in the background when a session starts and they are
+older than 30 minutes.
+
+If another extension already publishes the bridge's router contract,
+`claude-accounts` stays inactive and says so at session start, rather than both
+overwriting each other's choices.
 
 ## Why not pi-multi-account
 

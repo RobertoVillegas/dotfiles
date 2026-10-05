@@ -206,3 +206,41 @@ test("conversation pins survive a restart through the state", () => {
 	restarted.recordRateLimit("personal", {}, OPUS);
 	assert.throws(() => restarted.acquire({ modelId: OPUS, sessionId: "s1" }), SwitchNeedsApproval);
 });
+
+test("a subagent or background call follows its conversation's account", () => {
+	const { router } = setup("round-robin", "ask");
+	router.use("work", "parent");
+	router.recordSuccess("work", "parent");
+	// round-robin would hand a new session "personal"; inheriting keeps "work".
+	assert.equal(router.acquire({ modelId: OPUS, sessionId: "child", inherit: "work" }).profileId, "work");
+	assert.equal(router.acquire({ modelId: OPUS, inherit: "work" }).profileId, "work");
+	assert.equal(router.state.sessions.child?.profile, "work");
+});
+
+test("an inherited account that ran out is not swapped silently", () => {
+	const { router } = setup("failover", "ask");
+	router.recordRateLimit("personal", {}, OPUS);
+	assert.throws(() => router.acquire({ modelId: OPUS, sessionId: "compaction", inherit: "personal" }), SwitchNeedsApproval);
+	assert.throws(() => router.acquire({ modelId: OPUS, inherit: "personal" }), SwitchNeedsApproval);
+});
+
+test("auto lets an inherited request move like any other", () => {
+	const { router } = setup("failover", "auto");
+	router.recordRateLimit("personal", {}, OPUS);
+	assert.equal(router.acquire({ modelId: OPUS, sessionId: "child", inherit: "personal" }).profileId, "work");
+});
+
+test("a limit hit mid-response is offered as a switch afterwards", () => {
+	const { router } = setup("failover", "ask");
+	router.acquire({ modelId: OPUS, sessionId: "s1" });
+	router.recordSuccess("personal", "s1");
+	assert.equal(router.stalled(OPUS, "s1"), undefined);
+	// The bridge reports the limit but never calls acquire again for this turn.
+	router.recordRateLimit("personal", {}, OPUS);
+	assert.deepEqual(
+		{ from: router.stalled(OPUS, "s1")?.from, to: router.stalled(OPUS, "s1")?.to },
+		{ from: "personal", to: "work" },
+	);
+	router.config.switchConversations = "auto";
+	assert.equal(router.stalled(OPUS, "s1"), undefined);
+});

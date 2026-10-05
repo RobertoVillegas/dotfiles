@@ -2,19 +2,28 @@
 //
 // Publishes the bridge's account-router contract so every `pi-claude/*`
 // request runs the unmodified Claude Code binary under one of the configured
-// CLAUDE_CONFIG_DIRs. Switch by hand with /claude-account, or let the bridge
-// fail over when an account hits its limit. docs/pi-accounts.md in the
-// dotfiles explains the setup.
+// CLAUDE_CONFIG_DIRs. Switch by hand with /claude-account; a conversation that
+// runs out asks before moving. docs/pi-accounts.md in the dotfiles explains
+// the setup.
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { AccountRouter, emptyState, MODES, type Config, type Mode, type State, type SwitchPolicy } from "./router.ts";
 
 const ROUTER_SYMBOL = Symbol.for("kendex.pi.claude-account-router.v1");
+const ACCOUNT_HOST_SYMBOL = Symbol.for("kendex.pi.claude-bridge.account-host.v1");
 // Keeps one router per process across /reload, so conversation pins survive.
 const INSTANCE_SYMBOL = Symbol.for("dotfiles.pi.claude-accounts.v1");
+const OWNER = "dotfiles.claude-accounts";
 const STATUS_KEY = "claude-account";
+// Set by pi-subagents on the processes it launches.
+const CHILD_ENV = "PI_SUBAGENT_CHILD";
+const PARENT_SESSION_ENV = "PI_SUBAGENT_PARENT_SESSION";
+// The account of this process's active conversation, inherited by any child
+// process it starts, for children launched without a parent session id.
+const PROFILE_ENV = "PI_CLAUDE_ACCOUNTS_PROFILE";
+const USAGE_STALE_MS = 30 * 60_000;
 
 const agentDir = () => {
 	const dir = process.env.PI_CODING_AGENT_DIR?.trim();
@@ -44,11 +53,16 @@ function loadConfig(): Config | undefined {
 	return profiles.length > 0 ? { mode, switchConversations, profiles } : undefined;
 }
 
-/** State is shared with every other Pi process on this machine through one
- *  file, so a limit hit in one window is respected by the others. */
+/** State shared by every Pi process on this machine through one file, so a
+ *  limit hit in one window is respected by the others. Changes run as
+ *  read-modify-write under a lock directory, so two windows writing at once
+ *  cannot drop each other's cooldowns or conversation accounts. */
 class StateFile {
 	private mtimeMs = 0;
-	constructor(private readonly path: string) {}
+	private readonly lock: string;
+	constructor(private readonly path: string) {
+		this.lock = `${path}.lock`;
+	}
 
 	read(): State {
 		try {
@@ -79,12 +93,40 @@ class StateFile {
 			// Losing a cooldown only costs one failed attempt on another window.
 		}
 	}
+
+	/** Runs `fn` holding the lock. The bridge calls the router synchronously,
+	 *  so waiting is a short spin; a lock older than 5 s is a crashed holder. */
+	locked<T>(fn: () => T): T {
+		const deadline = Date.now() + 500;
+		let held = false;
+		while (!held) {
+			try {
+				mkdirSync(this.lock);
+				held = true;
+			} catch {
+				try {
+					if (Date.now() - statSync(this.lock).mtimeMs > 5_000) rmSync(this.lock, { recursive: true, force: true });
+				} catch {}
+				if (Date.now() > deadline) break; // proceed unlocked rather than stall a request
+			}
+		}
+		try {
+			return fn();
+		} finally {
+			if (held) rmSync(this.lock, { recursive: true, force: true });
+		}
+	}
 }
 
 interface Instance {
 	router: AccountRouter;
 	file: StateFile;
 	configMtimeMs: number;
+	/** The conversation this process is showing; other session ids that reach
+	 *  the router from this process are its background work. */
+	activeSessionId?: string;
+	/** Conversations whose last turn ended in an error. */
+	failedTurns: Set<string>;
 }
 
 const configMtime = () => {
@@ -111,30 +153,95 @@ function instance(): Instance | undefined {
 	}
 	const file = new StateFile(statePath());
 	const router = new AccountRouter(config, file.read(), Date.now, (state) => file.write(state));
-	const created = { router, file, configMtimeMs: mtime };
+	const created: Instance = { router, file, configMtimeMs: mtime, failedTurns: new Set() };
 	host[INSTANCE_SYMBOL] = created;
 	return created;
 }
 
-/** The contract object the bridge reads from globalThis. Every call first
- *  picks up state another Pi process wrote. */
-function contract({ router, file }: Instance) {
-	const sync = () => {
-		if (file.changed()) router.state = file.read();
-	};
+/** Applies one change to the freshest state, under the lock. */
+function transact<T>(inst: Instance, fn: () => T): T {
+	return inst.file.locked(() => {
+		if (inst.file.changed()) inst.router.state = inst.file.read();
+		return fn();
+	});
+}
+
+/** Whose account a request without its own pin should follow, if anyone's. */
+function inheritedProfile(inst: Instance, sessionId: string | undefined): string | undefined {
+	if (sessionId && inst.router.pin(sessionId)) return undefined;
+	if (process.env[CHILD_ENV] === "1") {
+		const parent = process.env[PARENT_SESSION_ENV];
+		return (parent && inst.router.pin(parent)?.profile) || process.env[PROFILE_ENV] || undefined;
+	}
+	const active = inst.activeSessionId;
+	if (active && sessionId !== active) return inst.router.pin(active)?.profile;
+	return undefined;
+}
+
+/** The contract object the bridge reads from globalThis. */
+function contract(inst: Instance) {
+	const { router } = inst;
 	return {
 		version: 1 as const,
-		acquire: (input: Parameters<AccountRouter["acquire"]>[0]) => (sync(), router.acquire(input)),
-		current: (modelId: string, sessionId?: string) => (sync(), router.current(modelId, sessionId)),
-		recordIdentity: (id: string, identity: { email?: string; subscriptionType?: string }) => router.recordIdentity(id, identity),
-		recordUsage: (id: string, usage: unknown) => router.recordUsage(id, usage),
+		owner: OWNER,
+		acquire: (input: Parameters<AccountRouter["acquire"]>[0]) =>
+			transact(inst, () => {
+				const route = router.acquire({ ...input, inherit: inheritedProfile(inst, input.sessionId) });
+				if (input.sessionId && input.sessionId === inst.activeSessionId) process.env[PROFILE_ENV] = route.profileId;
+				return route;
+			}),
+		current: (modelId: string, sessionId?: string) => transact(inst, () => router.current(modelId, sessionId)),
+		recordIdentity: (id: string, identity: { email?: string; subscriptionType?: string }) =>
+			transact(inst, () => router.recordIdentity(id, identity)),
+		recordUsage: (id: string, usage: unknown) => transact(inst, () => router.recordUsage(id, usage)),
 		recordRateLimit: (id: string, info: Record<string, unknown> | undefined, modelId: string) =>
-			(sync(), router.recordRateLimit(id, info, modelId)),
+			transact(inst, () => router.recordRateLimit(id, info, modelId)),
 		recordFailure: (id: string, kind: Parameters<AccountRouter["recordFailure"]>[1], modelId: string) =>
-			(sync(), router.recordFailure(id, kind, modelId)),
-		recordSuccess: (id: string, sessionId?: string) => router.recordSuccess(id, sessionId),
+			transact(inst, () => router.recordFailure(id, kind, modelId)),
+		recordSuccess: (id: string, sessionId?: string) => transact(inst, () => router.recordSuccess(id, sessionId)),
 		resolveProfile: (id: string) => router.resolveProfile(id),
 	};
+}
+
+/** Publishes the router unless another extension already owns the symbol:
+ *  two routers would silently overwrite each other's choices. */
+function publish(inst: Instance): string | undefined {
+	const host = globalThis as Record<symbol, unknown>;
+	const current = host[ROUTER_SYMBOL] as { owner?: string } | undefined;
+	if (current && current.owner !== OWNER) {
+		return "Another Claude account router is already installed; claude-accounts stays inactive. Remove one of them.";
+	}
+	host[ROUTER_SYMBOL] = contract(inst);
+	return undefined;
+}
+
+interface AccountHost {
+	version: 1;
+	probeProfile(input: { profile: ReturnType<AccountRouter["route"]>; cwd: string; signal?: AbortSignal }): Promise<{
+		identity?: { email?: string; subscriptionType?: string };
+		usage?: unknown;
+	}>;
+}
+
+/** Reads identity and 5-hour/7-day usage for every account through the
+ *  bridge's local /usage probe, which sends no model request. */
+async function refreshUsage(inst: Instance, cwd: string): Promise<number> {
+	const host = (globalThis as Record<symbol, unknown>)[ACCOUNT_HOST_SYMBOL] as AccountHost | undefined;
+	if (host?.version !== 1) return 0;
+	const results = await Promise.allSettled(
+		inst.router.config.profiles.map(async (p) => {
+			const before = inst.router.state.usage[p.id]?.at;
+			const result = await host.probeProfile({ profile: inst.router.route(p.id), cwd });
+			return transact(inst, () => {
+				if (result.identity?.email) inst.router.recordIdentity(p.id, result.identity);
+				if (result.usage) inst.router.recordUsage(p.id, result.usage);
+				// Counts only accounts that returned plan limits; one that is not
+				// logged in answers without them.
+				return inst.router.state.usage[p.id]?.at !== before ? 1 : 0;
+			});
+		}),
+	);
+	return results.reduce((n, r) => n + (r.status === "fulfilled" ? r.value : 0), 0);
 }
 
 function describe(router: AccountRouter, modelId: string, sessionId?: string): string {
@@ -160,7 +267,7 @@ function describe(router: AccountRouter, modelId: string, sessionId?: string): s
 				` · ${p.configDir ?? "~/.claude"}`,
 		);
 	}
-	lines.push("Use: /claude-account use <id> | next | mode <failover|round-robin|least-used> | switch <ask|auto> | reset");
+	lines.push("Use: /claude-account use <id> | next | refresh | mode <failover|round-robin|least-used> | switch <ask|auto> | reset");
 	return lines.join("\n");
 }
 
@@ -177,19 +284,55 @@ function showStatus(ctx: ExtensionContext, inst: Instance | undefined): void {
 
 export default function (pi: ExtensionAPI) {
 	const inst = instance();
-	if (inst) (globalThis as Record<symbol, unknown>)[ROUTER_SYMBOL] = contract(inst);
+	const conflict = inst ? publish(inst) : undefined;
 
-	pi.on("session_start", (_event, ctx) => showStatus(ctx, instance()));
+	pi.on("session_start", (_event, ctx) => {
+		const current = instance();
+		if (conflict && ctx.hasUI) ctx.ui.notify(conflict, "warning");
+		if (current) {
+			current.activeSessionId = ctx.sessionManager.getSessionId();
+			const known = current.router.pin(current.activeSessionId)?.profile;
+			if (known && process.env[CHILD_ENV] !== "1") process.env[PROFILE_ENV] = known;
+			// least-used needs figures; fetch them in the background when stale.
+			const stale = current.router.config.profiles.some((p) => {
+				const at = current.router.state.usage[p.id]?.at ?? 0;
+				return Date.now() - at > USAGE_STALE_MS;
+			});
+			if (current.router.config.mode === "least-used" && stale && process.env[CHILD_ENV] !== "1") {
+				void refreshUsage(current, ctx.cwd).catch(() => {});
+			}
+		}
+		showStatus(ctx, current);
+	});
 	pi.on("model_select", (_event, ctx) => showStatus(ctx, instance()));
-	pi.on("agent_end", (_event, ctx) => showStatus(ctx, instance()));
+
+	pi.on("agent_end", (event, ctx) => {
+		const current = instance();
+		if (current && ctx.model?.provider === "pi-claude") {
+			const last = [...event.messages].reverse().find((m) => (m as { role?: string }).role === "assistant") as
+				| { stopReason?: string; errorMessage?: string }
+				| undefined;
+			const sessionId = ctx.sessionManager.getSessionId();
+			if (last?.stopReason === "error" || last?.errorMessage) current.failedTurns.add(sessionId);
+			else current.failedTurns.delete(sessionId);
+		}
+		showStatus(ctx, current);
+	});
 
 	// A conversation whose account ran out stops instead of moving. Once Pi has
 	// settled, offer the switch; declining leaves the conversation as it is.
+	// Covers both a limit before the answer (the router refused the retry) and
+	// one in the middle of it (the bridge does not retry those at all).
 	pi.on("agent_settled", async (_event, ctx) => {
-		const router = instance()?.router;
+		const current = instance();
+		if (!current || !ctx.hasUI || ctx.model?.provider !== "pi-claude") return;
+		const { router } = current;
 		const sessionId = ctx.sessionManager.getSessionId();
-		const pending = router?.takePending(sessionId);
-		if (!router || !pending?.to || !ctx.hasUI) return;
+		const failed = current.failedTurns.delete(sessionId);
+		const pending =
+			router.takePending(sessionId) ??
+			(failed ? transact(current, () => router.stalled(ctx.model!.id, sessionId)) : undefined);
+		if (!pending?.to) return;
 		const target = router.label(pending.to);
 		const ok = await ctx.ui.confirm(
 			`Continue on ${target}?`,
@@ -197,8 +340,9 @@ export default function (pi: ExtensionAPI) {
 				"so the first turn costs more. Decline to keep it as it is and start a new conversation instead.",
 		);
 		if (!ok) return;
-		router.use(pending.to, sessionId);
-		showStatus(ctx, instance());
+		transact(current, () => router.use(pending.to!, sessionId));
+		process.env[PROFILE_ENV] = pending.to;
+		showStatus(ctx, current);
 		pi.sendUserMessage("Continue where you left off.");
 	});
 
@@ -207,7 +351,7 @@ export default function (pi: ExtensionAPI) {
 		getArgumentCompletions: (prefix) => {
 			const ids = instance()?.router.config.profiles.map((p) => p.id) ?? [];
 			const words = [
-				"use", "next", "mode", "switch", "reset",
+				"use", "next", "refresh", "mode", "switch", "reset",
 				...ids.map((id) => `use ${id}`), ...MODES.map((m) => `mode ${m}`), "switch ask", "switch auto",
 			];
 			return words.filter((w) => w.startsWith(prefix)).map((w) => ({ value: w, label: w }));
@@ -219,17 +363,22 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 			const { router } = current;
-			if (current.file.changed()) router.state = current.file.read();
 			const sessionId = ctx.sessionManager.getSessionId();
 			const modelId = ctx.model?.provider === "pi-claude" ? ctx.model.id : "claude-opus";
 			const [verb, value] = args.trim().split(/\s+/);
 			try {
 				if (verb === "use" && value) {
-					const route = router.use(value, sessionId);
+					const route = transact(current, () => router.use(value, sessionId));
+					process.env[PROFILE_ENV] = route.profileId;
 					ctx.ui.notify(`Next turn uses ${route.label}.`, "info");
 				} else if (verb === "next") {
-					const route = router.next(modelId, sessionId);
+					const route = transact(current, () => router.next(modelId, sessionId));
+					process.env[PROFILE_ENV] = route.profileId;
 					ctx.ui.notify(`Next turn uses ${route.label}.`, "info");
+				} else if (verb === "refresh") {
+					ctx.ui.notify("Reading usage for every account…", "info");
+					const n = await refreshUsage(current, ctx.cwd);
+					ctx.ui.notify(`${describe(router, modelId, sessionId)}\n(${n}/${router.config.profiles.length} accounts reported usage)`, "info");
 				} else if (verb === "mode" && MODES.includes(value as Mode)) {
 					// For this process; the file in the dotfiles keeps the default.
 					router.config.mode = value as Mode;
@@ -243,9 +392,10 @@ export default function (pi: ExtensionAPI) {
 						"info",
 					);
 				} else if (verb === "reset") {
-					router.reset();
+					transact(current, () => router.reset());
 					ctx.ui.notify("Cleared cooldowns and login flags.", "info");
 				} else {
+					if (current.file.changed()) router.state = current.file.read();
 					ctx.ui.notify(describe(router, modelId, sessionId), "info");
 				}
 			} catch (error) {

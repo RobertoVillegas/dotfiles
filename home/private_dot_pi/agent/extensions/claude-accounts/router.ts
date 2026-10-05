@@ -225,19 +225,36 @@ export class AccountRouter {
 			: `${this.label(id)} could not answer`;
 	}
 
-	acquire(input: { modelId: string; sessionId?: string; excludedProfileIds?: string[]; forceRerank?: boolean }): Route {
+	acquire(input: {
+		modelId: string;
+		sessionId?: string;
+		excludedProfileIds?: string[];
+		forceRerank?: boolean;
+		/** Account of the conversation this request works for: a subagent's
+		 *  parent, or the active conversation for a background call such as a
+		 *  compaction summary. Such a request follows that account and is held
+		 *  to the same approval rule instead of being routed as new. */
+		inherit?: string;
+	}): Route {
 		const excluded = new Set(input.excludedProfileIds ?? []);
 		const usable = (id: string) => !excluded.has(id) && this.available(id, input.modelId);
-		const pin = input.sessionId ? this.pin(input.sessionId) : undefined;
+		let pin = input.sessionId ? this.pin(input.sessionId) : undefined;
+
+		if (!pin && input.inherit && this.profile(input.inherit)) {
+			// Counted as used: leaving the parent's account needs the same approval.
+			if (input.sessionId) this.setPin(input.sessionId, input.inherit, true);
+			pin = { profile: input.inherit, used: true, at: this.now() };
+			if (!input.sessionId && usable(input.inherit) && !input.forceRerank) return this.route(input.inherit);
+		}
 
 		if (pin && usable(pin.profile) && !input.forceRerank) return this.route(pin.profile);
 
 		const chosen = pin ? this.order().find((id) => id !== pin.profile && usable(id)) ?? (usable(pin.profile) ? pin.profile : undefined) : this.order().find(usable);
 
 		// A conversation with history stays on its account unless allowed.
-		if (pin?.used && chosen !== pin.profile && this.config.switchConversations === "ask" && input.sessionId) {
+		if (pin?.used && chosen !== pin.profile && this.config.switchConversations === "ask") {
 			const reason = this.reason(pin.profile, input.modelId);
-			this.pending.set(input.sessionId, { from: pin.profile, to: chosen, reason });
+			if (input.sessionId) this.pending.set(input.sessionId, { from: pin.profile, to: chosen, reason });
 			const advice = chosen
 				? `Run /claude-account use ${chosen} to continue this conversation on ${this.label(chosen)}, or start a new one.`
 				: "No other account is available either.";
@@ -289,6 +306,16 @@ export class AccountRouter {
 		const current = this.current(modelId, sessionId)?.profileId;
 		const start = current ? ids.indexOf(current) : -1;
 		return this.use(ids[(start + 1) % ids.length]!, sessionId);
+	}
+
+	/** A used conversation whose account can no longer serve it, e.g. after a
+	 *  limit hit mid-response, which the bridge does not retry and so never
+	 *  reaches acquire. Returns the switch to offer, if any. */
+	stalled(modelId: string, sessionId: string): PendingSwitch | undefined {
+		const pin = this.pin(sessionId);
+		if (!pin?.used || this.available(pin.profile, modelId) || this.config.switchConversations !== "ask") return undefined;
+		const to = this.order().find((id) => id !== pin.profile && this.available(id, modelId));
+		return { from: pin.profile, to, reason: this.reason(pin.profile, modelId) };
 	}
 
 	/** The switch this conversation is waiting on, consumed once. */

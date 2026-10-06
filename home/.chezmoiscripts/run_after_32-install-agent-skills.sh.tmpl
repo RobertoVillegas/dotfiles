@@ -21,7 +21,18 @@ fi
 # global one. A failure here (offline, GitHub down, an untrusted source) leaves
 # the previous skills in place and must not abort the rest of the apply, but it
 # is reported loudly.
-if ! (cd / && dotagents install); then
+# dotagents fetches several skills from one repository in parallel and now
+# and then trips over its own shallow clone ("shallow file has changed since
+# we read it"); a second attempt succeeds, so retry before giving up.
+installed=""
+for attempt in 1 2 3; do
+  if (cd / && dotagents install); then
+    installed=1
+    break
+  fi
+  [ "$attempt" -lt 3 ] && sleep 2
+done
+if [ -z "$installed" ]; then
   echo "dotagents install failed; third-party skills were left as they were." >&2
 fi
 

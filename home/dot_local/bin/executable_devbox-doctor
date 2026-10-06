@@ -94,7 +94,6 @@ for pi_package in \
   npm:pi-memory \
   npm:@trevonistrevon/pi-loop \
   npm:@vanillagreen/pi-claude-bridge \
-  npm:pi-cursor-sdk \
   npm:@estebanforge/pi-antigravity-bridge \
   npm:pi-service-tier; do
   if ! [ -f "$pi_settings" ] ||

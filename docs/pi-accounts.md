@@ -30,6 +30,7 @@ created and removed by the extension. `personal` is the existing login in
 /claude-account usage                 # read each account's 5-hour/7-day usage now, then list
 /claude-account add work Mi trabajo   # create an account and sign in (browser opens)
 /claude-account login work            # sign in again, e.g. after a session expired
+/claude-account code <code>           # outside the terminal: the code Anthropic shows after signing in
 /claude-account use work              # this conversation from the next turn, and new ones by default
 /claude-account next                  # the next logged-in account
 /claude-account rename work Trabajo
@@ -41,8 +42,23 @@ created and removed by the extension. `personal` is the existing login in
 
 Account names are short slugs (`work`, `fun`, `dev-2`); the label is what the
 status bar shows. Signing in opens Anthropic's login in the browser and Pi
-notices when it completes. Over SSH, where the browser cannot reach the devbox,
-Pi shows the link and a field to paste the code Anthropic displays. Removing an
+notices when it completes. When the browser cannot come back to the machine
+running Pi, open the link Pi shows and paste the code Anthropic displays: in
+the terminal into the prompt Pi opens, in T3 and other clients with
+`/claude-account code <code>`.
+
+**Sign in in a private window when another account is open.** Anthropic reuses
+the browser's current session, so signing `personal` in from a browser logged
+in to the work account stores the work account under `personal`. Pi reports
+the email and plan after every sign-in and warns when two accounts are the same
+login. When an account's identity changes, its recorded limits and usage are
+dropped, because they belonged to the previous login.
+
+**On a Mac, sign in from where Pi will run.** Claude Code keeps logins in the
+macOS Keychain, which an SSH session cannot reach; there it falls back to a
+file. A login made over SSH is then invisible to Pi running under T3 on that
+Mac's desktop, which reads the Keychain first and may find an older login
+there. Sign in from a T3 thread or a terminal on the Mac's own screen. Removing an
 account signs it out of Claude Code and deletes its directory; removing
 `personal` only takes it off the list and leaves `~/.claude` logged in.
 

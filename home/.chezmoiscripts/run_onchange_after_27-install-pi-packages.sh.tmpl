@@ -31,7 +31,6 @@ packages=(
   npm:pi-memory@0.4.2
   npm:@trevonistrevon/pi-loop@0.7.15
   npm:@vanillagreen/pi-claude-bridge@4.0.8
-  npm:pi-cursor-sdk@0.4.0
   npm:@estebanforge/pi-antigravity-bridge@1.7.8
   npm:pi-service-tier@0.4.0
   # Several Claude subscriptions go through pi-claude-bridge and the
@@ -54,6 +53,10 @@ obsolete_packages=(
   # through its own loopback proxy, and could switch models on errors it read
   # as quota, against the ask-before-switching rule.
   npm:pi-multi-account
+  # Published every Cursor model in up to 18 variants (context size, speed,
+  # alias), about 250 entries that buried the Claude models in T3's picker.
+  # T3 Code has its own Cursor provider for when Cursor is wanted.
+  npm:pi-cursor-sdk
 )
 
 settings="$HOME/.pi/agent/settings.json"
@@ -123,6 +126,17 @@ pi update --extensions
 if [ -f "$settings" ] && [ "$(jq -r '.defaultProjectTrust // empty' "$settings")" = "" ]; then
   settings_tmp="$(mktemp)"
   jq '.defaultProjectTrust = "ask"' "$settings" >"$settings_tmp"
+  chmod 600 "$settings_tmp"
+  mv "$settings_tmp" "$settings"
+fi
+
+# Start on Claude through pi-claude-bridge. Without a default Pi takes the first
+# provider with a login, which on a devbox was an expired OpenAI session, and
+# T3 Code asks Pi for its default model for every new thread. Set only when no
+# default exists, so a model chosen in Pi stays.
+if [ -f "$settings" ] && [ -z "$(jq -r '(.defaultProvider // "") + (.defaultModel // "")' "$settings")" ]; then
+  settings_tmp="$(mktemp)"
+  jq '.defaultProvider = "pi-claude" | .defaultModel = "claude-opus-5-5"' "$settings" >"$settings_tmp"
   chmod 600 "$settings_tmp"
   mv "$settings_tmp" "$settings"
 fi

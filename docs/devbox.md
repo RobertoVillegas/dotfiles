@@ -43,7 +43,7 @@ during SSH login. macOS also gets Mole's `mo` command for interactive
 maintenance and disk analysis.
 
 The dotfiles install and update the reviewed Pi extensions, including the
-Claude Code, Cursor SDK, and Antigravity bridges, `pi-subagents`, and the
+Claude Code and Antigravity bridges, `pi-subagents`, and the
 `claude-accounts` extension. Pi credentials, sessions, memory, backups, account
 state, and local settings remain machine-private; logging in additional Claude
 accounts is described in [Pi accounts](pi-accounts.md).

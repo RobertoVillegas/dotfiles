@@ -287,8 +287,10 @@ export class AccountRouter {
 				.map((p) => this.blockedUntil(p.id, input.modelId))
 				.filter((t) => t > 0);
 			const resetAtMs = resets.length ? Math.min(...resets) : undefined;
-			const when = resetAtMs ? ` until ${new Date(resetAtMs).toLocaleString()}` : "";
-			throw new NoProfileAvailable(`No Claude account is available${when}. /claude-account shows why.`, resetAtMs);
+			// Each account's own reason: one may need a login while another waits
+			// for its limit, and the earliest reset alone hides the first.
+			const why = this.state.accounts.map((p) => this.reason(p.id, input.modelId)).join("; ");
+			throw new NoProfileAvailable(`No Claude account is available: ${why || "none configured"}.`, resetAtMs);
 		}
 		if (input.sessionId) {
 			// A new conversation advances the round-robin cursor; a failover
@@ -384,9 +386,41 @@ export class AccountRouter {
 		}
 	}
 
+	/** Records who an account signs in as. When that changes (a new login
+	 *  with another email or plan), what was recorded for the old identity is
+	 *  dropped: its limits, usage and failed logins belonged to someone else. */
 	recordIdentity(id: string, identity: { email?: string; subscriptionType?: string }): void {
+		const before = this.state.identity[id];
+		const plan = (value?: string) => value?.toLowerCase().replace(/^claude\s+/, "").trim() || undefined;
+		const changed = Boolean(
+			before &&
+				((before.email && identity.email && before.email.toLowerCase() !== identity.email.toLowerCase()) ||
+					(plan(before.subscriptionType) && plan(identity.subscriptionType) &&
+						plan(before.subscriptionType) !== plan(identity.subscriptionType))),
+		);
+		if (changed) this.forgetLimits(id);
 		this.state.identity[id] = { email: identity.email, subscriptionType: identity.subscriptionType };
 		this.persist(this.state);
+	}
+
+	/** Drops one account's cooldowns, failed-login mark and usage figures. */
+	forgetLimits(id: string): void {
+		for (const key of Object.keys(this.state.cooldowns)) {
+			if (key === id || key.startsWith(`${id}|`)) delete this.state.cooldowns[key];
+		}
+		delete this.state.needsLogin[id];
+		delete this.state.usage[id];
+		if (this.state.usageCheckedAt) delete this.state.usageCheckedAt[id];
+		if (this.state.usageUnavailable) delete this.state.usageUnavailable[id];
+	}
+
+	/** Other accounts signed in with the same email as this one. */
+	sameLogin(id: string): string[] {
+		const email = this.state.identity[id]?.email?.toLowerCase();
+		if (!email) return [];
+		return this.state.accounts
+			.map((p) => p.id)
+			.filter((other) => other !== id && this.state.identity[other]?.email?.toLowerCase() === email);
 	}
 
 	/** Usage from a rate-limit event's `unifiedWindows`, where utilization is a

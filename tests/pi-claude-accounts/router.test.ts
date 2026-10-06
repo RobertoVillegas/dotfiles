@@ -323,3 +323,41 @@ test("a rejection's unified windows become the account's usage", () => {
 	assert.equal(router.state.usageUnavailable.work, undefined);
 	assert.equal(router.available("work", OPUS), false);
 });
+
+test("a new login with another identity drops the old one's limits and usage", () => {
+	const { router } = setup();
+	router.recordIdentity("personal", { email: "work@example.com", subscriptionType: "team" });
+	router.recordRateLimit("personal", { rateLimitType: "seven_day", unifiedWindows: { seven_day: { utilization: 1 } } }, OPUS);
+	assert.equal(router.available("personal", OPUS), false);
+	router.recordIdentity("personal", { email: "me@example.com", subscriptionType: "Claude Pro" });
+	assert.equal(router.available("personal", OPUS), true);
+	assert.equal(router.state.usage.personal, undefined);
+});
+
+test("the same identity reported in another format keeps its limits", () => {
+	const { router } = setup();
+	router.recordIdentity("personal", { email: "Me@Example.com", subscriptionType: "pro" });
+	router.recordRateLimit("personal", {}, OPUS);
+	router.recordIdentity("personal", { email: "me@example.com", subscriptionType: "Claude Pro" });
+	assert.equal(router.available("personal", OPUS), false);
+});
+
+test("accounts signed in with the same email are reported", () => {
+	const { router } = setup();
+	router.recordIdentity("personal", { email: "same@example.com" });
+	router.recordIdentity("work", { email: "same@example.com" });
+	assert.deepEqual(router.sameLogin("personal"), ["work"]);
+	router.recordIdentity("work", { email: "other@example.com" });
+	assert.deepEqual(router.sameLogin("personal"), []);
+});
+
+test("no account available names each account's reason", () => {
+	const { router } = setup();
+	router.recordRateLimit("work", { rateLimitType: "seven_day" }, OPUS);
+	router.recordFailure("personal", "auth", OPUS);
+	assert.throws(
+		() => router.acquire({ modelId: OPUS, sessionId: "fresh" }),
+		(error: unknown) =>
+			error instanceof NoProfileAvailable && /Personal needs to log in again/.test(error.message) && /Work reached its limit/.test(error.message),
+	);
+});

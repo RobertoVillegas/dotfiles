@@ -127,6 +127,17 @@ if [ -f "$settings" ] && [ "$(jq -r '.defaultProjectTrust // empty' "$settings")
   mv "$settings_tmp" "$settings"
 fi
 
+# Start on Claude through pi-claude-bridge. Without a default Pi takes the first
+# provider with a login, which on a devbox was an expired OpenAI session, and
+# T3 Code asks Pi for its default model for every new thread. Set only when no
+# default exists, so a model chosen in Pi stays.
+if [ -f "$settings" ] && [ -z "$(jq -r '(.defaultProvider // "") + (.defaultModel // "")' "$settings")" ]; then
+  settings_tmp="$(mktemp)"
+  jq '.defaultProvider = "pi-claude" | .defaultModel = "claude-opus-5-5"' "$settings" >"$settings_tmp"
+  chmod 600 "$settings_tmp"
+  mv "$settings_tmp" "$settings"
+fi
+
 # Conservative defaults for the Antigravity bridge. The config remains
 # machine-local and user-editable after creation; chezmoi never overwrites it.
 # bridgeTools "mcp" still matches only pi-mcp-adapter tools (bridge 1.7.8), so

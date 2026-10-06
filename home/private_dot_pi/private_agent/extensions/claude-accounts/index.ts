@@ -10,7 +10,7 @@ import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@e
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
-import { authStatus, login, logout, type AuthStatus } from "./claude-cli.ts";
+import { authStatus, login, logout, startLogin, type AuthStatus, type LoginSession } from "./claude-cli.ts";
 import {
 	AccountRouter,
 	emptyState,
@@ -314,6 +314,21 @@ function age(at: number | undefined): string {
 }
 
 /** Asks Claude Code whether each account is logged in, and records it. */
+/** Pairs of accounts signed in with the same email, as "a and b". */
+function duplicateLogins(router: AccountRouter): string[] {
+	const seen = new Set<string>();
+	const pairs: string[] = [];
+	for (const p of router.state.accounts) {
+		for (const other of router.sameLogin(p.id)) {
+			const key = [p.id, other].sort().join("|");
+			if (seen.has(key)) continue;
+			seen.add(key);
+			pairs.push(`${router.label(p.id)} and ${router.label(other)}`);
+		}
+	}
+	return pairs;
+}
+
 async function checkLogins(inst: Instance): Promise<Map<string, AuthStatus | undefined>> {
 	const accounts = [...inst.router.state.accounts];
 	const statuses = await Promise.all(accounts.map((p) => authStatus(p.configDir)));
@@ -360,8 +375,11 @@ function describe(router: AccountRouter, modelId: string, sessionId: string | un
 				`${flags.length ? ` · ${flags.join(", ")}` : ""}`,
 		);
 	}
+	for (const pair of duplicateLogins(router)) {
+		lines.push(`  ⚠ ${pair} are the same login: run /claude-account login <name> again in a private window.`);
+	}
 	lines.push(
-		"Use: /claude-account list | usage | use <name> | next | add <name> [label] | login <name> | rename <name> <label> | remove <name> | mode <failover|round-robin|least-used> | switch <ask|auto> | reset",
+		"Use: /claude-account list | usage | use <name> | next | add <name> [label] | login <name> | code <code> | rename <name> <label> | remove <name> | mode <failover|round-robin|least-used> | switch <ask|auto> | reset",
 	);
 	return lines.join("\n");
 }
@@ -393,25 +411,18 @@ function showStatus(ctx: ExtensionContext, inst: Instance): void {
 }
 
 /** Signs one account in through Claude Code, entirely from Pi. */
-async function signIn(inst: Instance, ctx: ExtensionCommandContext, id: string): Promise<boolean> {
+/** Records the result of a sign-in and tells the user, including when the
+ *  account turned out to be the same login as another one. */
+async function finishSignIn(inst: Instance, ctx: ExtensionContext, id: string, ok: boolean): Promise<boolean> {
 	const account = inst.router.profile(id);
-	if (!account) throw new Error(`Unknown Claude account "${id}"`);
+	if (!account) return false;
 	const label = account.label ?? id;
-	if (account.configDir) mkdirSync(account.configDir, { recursive: true, mode: 0o700 });
-	ctx.ui.notify(`Signing in to ${label}: a browser window opens with Anthropic's login.`, "info");
-	const ok = await login(account.configDir, {
-		onLink: (url, finished) => {
-			ctx.ui.notify(`If no browser opened (for example over SSH), open this link, sign in, and paste the code it shows:\n${url}`, "info");
-			return ctx.ui.input(`Sign in to ${label}`, "Paste the code here, or just wait if the browser finished", {
-				signal: finished,
-			});
-		},
-	});
 	const status = await authStatus(account.configDir);
 	const loggedIn = Boolean(ok && status?.loggedIn);
-	transact(inst, () => {
+	const duplicates = transact(inst, () => {
 		inst.router.setLoggedIn(id, loggedIn);
 		if (loggedIn && status?.email) inst.router.recordIdentity(id, status);
+		return loggedIn ? inst.router.sameLogin(id) : [];
 	});
 	ctx.ui.notify(
 		loggedIn
@@ -419,7 +430,64 @@ async function signIn(inst: Instance, ctx: ExtensionCommandContext, id: string):
 			: `${label} did not log in. Try again with /claude-account login ${id}.`,
 		loggedIn ? "info" : "warning",
 	);
+	if (duplicates.length > 0) {
+		ctx.ui.notify(
+			`${label} signed in with the same account as ${duplicates.map((d) => inst.router.label(d)).join(", ")}. ` +
+				"The browser reused its open session: run /claude-account login " + id + " again in a private window.",
+			"warning",
+		);
+	}
 	return loggedIn;
+}
+
+/** Sign-ins waiting for the user, by account. A waiting `claude auth login`
+ *  does not exit when Pi does, so every exit path cancels them. */
+const pendingLogins = new Map<string, LoginSession>();
+const cancelPendingLogins = () => {
+	for (const session of pendingLogins.values()) session.cancel();
+	pendingLogins.clear();
+};
+process.once("exit", cancelPendingLogins);
+
+/** Signs one account in through Claude Code, entirely from Pi. */
+async function signIn(inst: Instance, ctx: ExtensionCommandContext, id: string): Promise<void> {
+	const account = inst.router.profile(id);
+	if (!account) throw new Error(`Unknown Claude account "${id}"`);
+	const label = account.label ?? id;
+	if (account.configDir) mkdirSync(account.configDir, { recursive: true, mode: 0o700 });
+
+	// The terminal can show a prompt that closes itself when the browser comes
+	// back. Other clients, T3 among them, may keep such a prompt open after it
+	// is dismissed, so there the code is sent with a command instead.
+	if (ctx.mode === "tui") {
+		ctx.ui.notify(`Signing in to ${label}: a browser window opens with Anthropic's login.`, "info");
+		const ok = await login(account.configDir, {
+			onLink: (url, finished) => {
+				ctx.ui.notify(`If no browser opened (for example over SSH), open this link, sign in, and paste the code it shows:\n${url}`, "info");
+				return ctx.ui.input(`Sign in to ${label}`, "Paste the code here, or just wait if the browser finished", {
+					signal: finished,
+				});
+			},
+		});
+		await finishSignIn(inst, ctx, id, ok);
+		return;
+	}
+
+	pendingLogins.get(id)?.cancel();
+	const session = startLogin(account.configDir);
+	pendingLogins.set(id, session);
+	const url = await session.link;
+	ctx.ui.notify(
+		`Signing in to ${label}. If a browser opened on this machine, finish there. Otherwise open this link, ` +
+			`sign in with the account for ${label} (a private window avoids reusing another login), and send the code ` +
+			`it shows with: /claude-account code <code>` + (url ? `\n${url}` : ""),
+		"info",
+	);
+	void session.done.then(async (ok) => {
+		if (pendingLogins.get(id) === session) pendingLogins.delete(id);
+		await finishSignIn(inst, ctx, id, ok).catch(() => {});
+		showStatus(ctx, inst);
+	});
 }
 
 /** Splits `name rest of the label`, dropping quotes around the label. */
@@ -447,6 +515,7 @@ export default function (pi: ExtensionAPI) {
 		showStatus(ctx, current);
 	});
 	pi.on("model_select", (_event, ctx) => showStatus(ctx, instance()));
+	pi.on("session_shutdown", () => cancelPendingLogins());
 
 	pi.on("agent_end", (event, ctx) => {
 		const current = instance();
@@ -503,7 +572,7 @@ export default function (pi: ExtensionAPI) {
 		description: "Add, sign in, show or switch the Claude subscriptions pi-claude-bridge uses",
 		getArgumentCompletions: (prefix) => {
 			const ids = instance().router.state.accounts.map((p) => p.id);
-			const verbs = ["list", "usage", "use", "next", "add", "login", "rename", "remove", "refresh", "mode", "switch", "reset"];
+			const verbs = ["list", "usage", "use", "next", "add", "login", "code", "rename", "remove", "refresh", "mode", "switch", "reset"];
 			const words = [
 				...verbs,
 				...["use", "login", "rename", "remove"].flatMap((verb) => ids.map((id) => `${verb} ${id}`)),
@@ -536,6 +605,25 @@ export default function (pi: ExtensionAPI) {
 					const [name, label] = nameAndLabel(rest);
 					transact(current, () => router.addAccount(name, label, join(accountsDir(), name)));
 					await signIn(current, ctx, name);
+				} else if (verb === "code" && value) {
+					// The code for the sign-in started last; `code <name> <code>` picks one.
+					const [maybeName, maybeCode] = rest.split(/\s+/);
+					const target = maybeCode && pendingLogins.has(maybeName!) ? maybeName! : [...pendingLogins.keys()].pop();
+					const code = maybeCode && target === maybeName ? maybeCode : value;
+					const session = target ? pendingLogins.get(target) : undefined;
+					if (!session) throw new Error("No sign-in is waiting for a code. Start one with /claude-account login <name>.");
+					session.submitCode(code);
+					ctx.ui.notify(`Code sent to the ${router.label(target!)} sign-in.`, "info");
+					// A rejected code makes Claude Code ask again instead of exiting.
+					setTimeout(() => {
+						if (pendingLogins.get(target!) === session) {
+							ctx.ui.notify(
+								`Claude Code has not accepted that code. Check it and send it again with /claude-account code <code>, ` +
+									`or start over with /claude-account login ${target}.`,
+								"warning",
+							);
+						}
+					}, 20_000).unref?.();
 				} else if (verb === "login" && value) {
 					if (!ctx.hasUI) throw new Error("Signing in needs the interactive login.");
 					await signIn(current, ctx, value);
@@ -553,6 +641,8 @@ export default function (pi: ExtensionAPI) {
 						? `This signs ${label} out of Claude Code${ownsDir ? " and deletes its saved session" : ""}.`
 						: `${label} uses your main Claude Code login (~/.claude); it stays logged in for Claude Code and is only removed from this list.`;
 					if (!(await ctx.ui.confirm(`Remove ${label}?`, what))) return;
+					pendingLogins.get(value)?.cancel();
+					pendingLogins.delete(value);
 					if (account.configDir) await logout(account.configDir);
 					if (ownsDir) rmSync(account.configDir!, { recursive: true, force: true });
 					transact(current, () => router.removeAccount(value));

@@ -81,52 +81,58 @@ export async function logout(configDir: string | undefined): Promise<boolean> {
 const stripEscapes = (text: string) =>
 	text.replace(/\x1b\]8;;[^\x07\x1b]*(?:\x07|\x1b\\)/g, "").replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
 
-export interface LoginHooks {
-	/** Called once with the sign-in link the CLI printed. Resolves with a code
-	 *  the user pasted, or undefined when they did not paste one. The signal
-	 *  aborts when the CLI finishes on its own (the browser came back). */
-	onLink(url: string, finished: AbortSignal): Promise<string | undefined>;
+export interface LoginSession {
+	/** The sign-in link the CLI printed, or undefined if it printed none. */
+	link: Promise<string | undefined>;
+	/** Sends the code Anthropic shows when the browser cannot come back. */
+	submitCode(code: string): void;
+	cancel(): void;
+	/** Resolves when the CLI exits: true when it signed in. */
+	done: Promise<boolean>;
 }
 
 /**
- * `claude auth login --claudeai` for one account. On a desktop the CLI opens
- * the browser and receives the result on localhost by itself; over SSH the
- * user opens the link elsewhere and pastes the code Anthropic shows, which is
- * written to the CLI's stdin. Gives up after ten minutes.
+ * Starts `claude auth login --claudeai` for one account and returns at once.
+ * On a desktop the CLI opens the browser and receives the result on
+ * localhost by itself; elsewhere the user opens the link and the code
+ * Anthropic shows goes to the CLI's stdin through submitCode. Gives up after
+ * ten minutes.
  */
-export function login(configDir: string | undefined, hooks: LoginHooks): Promise<boolean> {
-	return new Promise((resolve) => {
-		const child = spawn(claudeBinary(), ["auth", "login", "--claudeai"], {
-			env: accountEnv(configDir),
-			stdio: ["pipe", "pipe", "pipe"],
-		});
-		const finished = new AbortController();
-		let out = "";
-		let asked = false;
-		const timer = setTimeout(() => child.kill(), 10 * 60_000);
-		const onOutput = (chunk: Buffer) => {
-			out += chunk.toString();
-			const link = /https:\/\/\S+oauth\/authorize\S*/.exec(stripEscapes(out))?.[0];
-			if (!link || asked) return;
-			asked = true;
-			void hooks.onLink(link, finished.signal).then((code) => {
-				if (child.exitCode !== null || finished.signal.aborted) return;
-				// No code and the CLI still waiting: the user dismissed the prompt.
-				if (code?.trim()) child.stdin.write(`${code.trim()}\n`);
-				else child.kill();
-			});
-		};
-		child.stdout.on("data", onOutput);
-		child.stderr.on("data", onOutput);
-		child.on("error", () => {
-			clearTimeout(timer);
-			finished.abort();
-			resolve(false);
-		});
-		child.on("close", (code) => {
-			clearTimeout(timer);
-			finished.abort();
-			resolve(code === 0);
-		});
+export function startLogin(configDir: string | undefined): LoginSession {
+	const child = spawn(claudeBinary(), ["auth", "login", "--claudeai"], {
+		env: accountEnv(configDir),
+		stdio: ["pipe", "pipe", "pipe"],
 	});
+	let out = "";
+	let resolveLink: (url: string | undefined) => void = () => {};
+	const link = new Promise<string | undefined>((resolve) => (resolveLink = resolve));
+	const timer = setTimeout(() => child.kill(), 10 * 60_000);
+	const linkTimer = setTimeout(() => resolveLink(undefined), 20_000);
+	const onOutput = (chunk: Buffer) => {
+		out += chunk.toString();
+		const found = /https:\/\/\S+oauth\/authorize\S*/.exec(stripEscapes(out))?.[0];
+		if (found) resolveLink(found);
+	};
+	child.stdout.on("data", onOutput);
+	child.stderr.on("data", onOutput);
+	const done = new Promise<boolean>((resolve) => {
+		const finish = (ok: boolean) => {
+			clearTimeout(timer);
+			clearTimeout(linkTimer);
+			resolveLink(undefined);
+			resolve(ok);
+		};
+		child.on("error", () => finish(false));
+		child.on("close", (code) => finish(code === 0));
+	});
+	return {
+		link,
+		done,
+		submitCode: (code) => {
+			if (child.exitCode === null && code.trim()) child.stdin.write(`${code.trim()}\n`);
+		},
+		cancel: () => {
+			if (child.exitCode === null) child.kill();
+		},
+	};
 }

@@ -34,6 +34,7 @@ Personal (chezmoi):
 | `grill-me` | `mattpocock/skills`, adapted: model-invocable, links to `grilling` by path |
 | `wait-what` | `mattpocock/skills`, adapted: model-invocable, explicit trigger |
 | `show-me` | `humanlayer/skills`, adapted: no macOS `open`, model-invocable |
+| `pr-description` | personal PR-writing workflow: problem, behavior, evidence, and rollout; optional `show-me` diagrams |
 
 Third-party (dotagents): `diagnosing-bugs`, `grilling`, `prototype`, and
 `writing-for-agents` from `mattpocock/skills`; `find-docs` from

@@ -47,7 +47,7 @@ replace the adaptation with upstream on the next install.
 
 ## Versions follow upstream
 
-Third-party sources carry no `ref`. Each apply installs the newest upstream
+Third-party sources carry no `ref`. Each install takes the newest upstream
 commit that is at least four hours old (`minimum_release_age = 240`), the same
 quarantine mise and pnpm use. The daily `dotfiles-autoupdate` is therefore what
 moves them forward. Pin a `ref` (tag or commit) only for a skill that must not
@@ -84,8 +84,15 @@ removes its dangling Claude link. To make a third-party skill personal (to adapt
 it), remove its entry first, apply, then add the adapted copy under
 `home/dot_agents/skills` and record why in the table above.
 
-To refresh before the next scheduled update, run `chezmoi apply` or
-`(cd / && dotagents install)`.
+The install is skipped unless `~/.agents/agents.toml` or the dotagents version
+changed, or the last successful install is over 20 hours old: dotagents fetches
+every source on each install, and `stablyai/orca` moves so often that it
+refetches its whole history each time. The stamp lives in
+`~/.local/state/dotfiles/agent-skills-installed`. Relinking for Claude runs on
+every apply.
+
+To refresh before the next scheduled update, run
+`DOTFILES_SKILLS_FORCE=1 chezmoi apply` or `(cd / && dotagents install)`.
 
 ## Discovery is not installation
 

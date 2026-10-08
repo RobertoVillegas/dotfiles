@@ -10,7 +10,7 @@ import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@e
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
-import { authStatus, login, logout, startLogin, type AuthStatus, type LoginSession } from "./claude-cli.ts";
+import { authStatus, logout, startLogin, type AuthStatus, type LoginSession } from "./claude-cli.ts";
 import {
 	AccountRouter,
 	emptyState,
@@ -456,26 +456,35 @@ async function signIn(inst: Instance, ctx: ExtensionCommandContext, id: string):
 	const label = account.label ?? id;
 	if (account.configDir) mkdirSync(account.configDir, { recursive: true, mode: 0o700 });
 
+	pendingLogins.get(id)?.cancel();
+	const session = startLogin(account.configDir);
+	pendingLogins.set(id, session);
+
 	// The terminal can show a prompt that closes itself when the browser comes
 	// back. Other clients, T3 among them, may keep such a prompt open after it
 	// is dismissed, so there the code is sent with a command instead.
 	if (ctx.mode === "tui") {
 		ctx.ui.notify(`Signing in to ${label}: a browser window opens with Anthropic's login.`, "info");
-		const ok = await login(account.configDir, {
-			onLink: (url, finished) => {
-				ctx.ui.notify(`If no browser opened (for example over SSH), open this link, sign in, and paste the code it shows:\n${url}`, "info");
-				return ctx.ui.input(`Sign in to ${label}`, "Paste the code here, or just wait if the browser finished", {
-					signal: finished,
+		const finished = new AbortController();
+		void session.done.then(() => finished.abort());
+		const url = await session.link;
+		if (url && !finished.signal.aborted) {
+			ctx.ui.notify(`If no browser opened (for example over SSH), open this link, sign in, and paste the code it shows:\n${url}`, "info");
+			void ctx.ui
+				.input(`Sign in to ${label}`, "Paste the code here, or just wait if the browser finished", { signal: finished.signal })
+				.then((code) => {
+					if (finished.signal.aborted) return;
+					// No code and the CLI still waiting: the user dismissed the prompt.
+					if (code?.trim()) session.submitCode(code);
+					else session.cancel();
 				});
-			},
-		});
+		}
+		const ok = await session.done;
+		if (pendingLogins.get(id) === session) pendingLogins.delete(id);
 		await finishSignIn(inst, ctx, id, ok);
 		return;
 	}
 
-	pendingLogins.get(id)?.cancel();
-	const session = startLogin(account.configDir);
-	pendingLogins.set(id, session);
 	const url = await session.link;
 	ctx.ui.notify(
 		`Signing in to ${label}. If a browser opened on this machine, finish there. Otherwise open this link, ` +

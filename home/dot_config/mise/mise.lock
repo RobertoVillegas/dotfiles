@@ -112,6 +112,10 @@ backend = "npm:agent-browser"
 [tools."npm:agent-browser".options]
 allow_builds = '["agent-browser"]'
 
+[[tools."npm:cf"]]
+version = "1.0.0-beta.17"
+backend = "npm:cf"
+
 [[tools."npm:dev3000"]]
 version = "0.0.178"
 backend = "npm:dev3000"

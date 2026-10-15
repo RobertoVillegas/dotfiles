@@ -40,6 +40,9 @@ worktrunk = "0.77.0"
 "npm:agent-browser" = { version = "0.38.1", allow_builds = ["agent-browser"] }
 "npm:dev3000" = "0.0.178"
 "npm:portless" = "0.15.6"
+# Cloudflare's CLI for the whole API (DNS, zones); Wrangler has no DNS commands.
+# Still in beta, so keep an exact pin and read the changelog before bumping.
+"npm:cf" = "1.0.0-beta.17"
 # Nightly on purpose: Orchestrator V2 (Pi provider, delegate_task) is not in a
 # stable release yet. Keep it equal to the T3 Code nightly desktop app.
 "npm:t3" = { version = "0.0.46-nightly.20261005.2667", npm_args = "--legacy-peer-deps" }

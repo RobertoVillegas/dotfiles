@@ -1,0 +1,38 @@
+[
+  {
+    "name": "brew",
+    "title": "Brew"
+  },
+  {
+    "name": "coffee",
+    "title": "Coffee"
+  },
+  {
+    "name": "color-picker",
+    "title": "Color Picker"
+  },
+  {
+    "name": "github",
+    "title": "GitHub"
+  },
+  {
+    "name": "kill-process",
+    "title": "Kill Process"
+  },
+  {
+    "name": "mole",
+    "title": "Mole"
+  },
+  {
+    "name": "port-manager",
+    "title": "Port Manager"
+  },
+  {
+    "name": "remove-paywall",
+    "title": "Remove Paywall"
+  },
+  {
+    "name": "speedtest",
+    "title": "Speedtest"
+  }
+]

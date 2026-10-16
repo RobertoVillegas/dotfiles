@@ -7,5 +7,7 @@ pre-commit:
     - name: secrets
       run: gitleaks git --pre-commit --staged --redact --no-banner
     - name: templates
-      glob: "home/**/*"
+      glob:
+        - "home/*"
+        - "home/**/*"
       run: scripts/check-templates {staged_files}

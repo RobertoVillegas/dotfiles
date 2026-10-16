@@ -11,7 +11,8 @@ chezmoi source for the user's workstation and devboxes. chezmoi reads only `home
 
 - Every commit that reaches `main` must be signed with the workstation's key (SSH signing through 1Password). Merge locally with `git merge --no-ff -S <branch>` and push. Never merge with `gh pr merge` or the GitHub button: GitHub signs with its own key, and every devbox stops updating.
 - Before pushing to `main`, check `git -c gpg.ssh.allowedSignersFile=home/dot_config/dotfiles/allowed_signers verify-commit HEAD`.
-- A bug fix goes straight to `main`. A feature goes through a pull request, and the user decides when it merges.
+- A bug fix goes straight to `main`. A feature or chore goes through a pull request.
+- Merge authority is granted per task. When the request says to merge, land, ship, "do all of it", or run autonomously, merge once the checks pass and report it; do not ask again. Without that grant, leave the PR ready and say so.
 - No `Co-Authored-By` or "Generated with" lines.
 
 ## Checks

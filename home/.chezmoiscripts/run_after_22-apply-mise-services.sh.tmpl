@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{- if eq .profile "dev" }}
+# Installs or updates the tool-update service declared in config.local.toml.
+# Runs on every apply, not only when the config changes: on Linux mise records
+# the versioned Homebrew keg (Cellar/mise/<version>/bin/mise) in the unit, and
+# brew deletes that path after it upgrades mise. Applying again rewrites the
+# unit with the current path and restarts the service.
+export PATH="/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
+command -v mise >/dev/null 2>&1 || exit 0
+
+# From / so a project's mise.toml cannot add or hide services.
+cd /
+if ! mise bootstrap services apply; then
+  echo "warn: could not apply mise bootstrap services; run 'mise bootstrap services apply' from a desktop session" >&2
+fi
+{{- end }}

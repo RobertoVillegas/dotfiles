@@ -150,7 +150,7 @@ El perfil devbox prepara una máquina macOS o Linux para trabajar remotamente:
 - T3 Code (Orchestrator V2, canal nightly) como control surface de Codex,
   Claude Code, OpenCode y Pi, con delegación entre ellos.
 - Node LTS, npm, pnpm, Bun y CLIs globales administrados por mise.
-- Antigravity, Codex, Claude Code, OpenCode, Pi y Prime Agent.
+- Antigravity, Codex, Claude Code, OpenCode y Pi.
 - Ax y Agent Browser para acceso y automatización web.
 - Context7 por CLI para consultar documentación actual, sin MCP.
 - Skills globales para Herdr, descubrimiento y documentación; las de terceros
@@ -368,7 +368,7 @@ Las versiones viven junto a cada instalador:
 | Skills de terceros (siguen upstream) | `dot_agents/agents.toml.tmpl` |
 | T3 Code (nightly) | `npm:t3` en mise + cask `t3-code@nightly` |
 | Druk | `dot_config/dotfiles/Brewfile.tmpl` (`letstri/tap`) |
-| Ax, terminal-code y Prime Agent | su propio `run_onchange_after_*` |
+| Ax y terminal-code | su propio `run_onchange_after_*` |
 | Plugins de Herdr | `run_onchange_after_30-install-herdr-plugins.sh.tmpl` (`--ref`) |
 
 Antigravity es la excepción: su instalador sólo acepta `--dir` y siempre baja la

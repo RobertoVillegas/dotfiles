@@ -2,8 +2,8 @@
 set -u
 
 # Scheduled `chezmoi update` for the devbox profile. Pulls the dotfiles repo and
-# applies it, so the scripts that track upstream versions (Prime Agent, mise
-# tools) pick up releases without a manual sync. Driven by a launchd agent on
+# applies it, so the scripts that track upstream versions (mise tools,
+# skills) pick up releases without a manual sync. Driven by a launchd agent on
 # macOS and a systemd user timer on Linux.
 
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"

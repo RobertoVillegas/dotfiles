@@ -170,14 +170,6 @@ if command -v claude >/dev/null 2>&1; then
 		"$scripts/…20-install-runtime-tools"
 fi
 
-if command -v prime-agent >/dev/null 2>&1; then
-	# prime-agent reporta la versión en stderr.
-	report "prime-agent" \
-		"$(prime-agent --version 2>&1 | tr -d '[:space:]')" \
-		"$(curl -fsSL https://pub-728493de92a943e2a9b2d17b4719f318.r2.dev/stable 2>/dev/null)" \
-		"$scripts/…29-install-prime-agent"
-fi
-
 if command -v ax >/dev/null 2>&1; then
 	report "ax" "$(ax --version 2>/dev/null | head -1)" \
 		"$(github_latest_release yusukebe/ax)" "$scripts/…25-install-ax" \

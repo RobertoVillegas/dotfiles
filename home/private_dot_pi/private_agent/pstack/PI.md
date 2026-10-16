@@ -39,5 +39,5 @@ Model roles come from `~/.cursor/rules/pstack-models.mdc`, which chezmoi manages
 The repository's own instructions and `~/.pi/agent/AGENTS.md` still apply where they are stricter than pstack:
 
 - Worktrunk (`wt`) creates and removes worktrees. Ask it for a fresh worktree off the right base instead of calling `git worktree` directly, and keep one writer per checkout.
-- Merging is a separate decision. Merge only when the user asks you to merge, land, or ship, as pstack's Babysit and Shipping playbooks already require.
+- Merging follows the agent context: authority is granted per task ("merge", "land", "ship", "do all of it", "full autopilot"), as in pstack's Shipping and Autopilot playbooks. Without it, Babysit stops at merge-ready.
 - Local services stay private to the host or the tailnet.

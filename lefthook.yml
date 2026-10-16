@@ -1,0 +1,13 @@
+# Checks that run before each commit, on this machine. The repository is public
+# and machines apply main unattended, so a broken template or a leaked secret
+# has to stop here. `lefthook run pre-commit --all-files` checks everything.
+pre-commit:
+  parallel: true
+  jobs:
+    - name: secrets
+      run: gitleaks git --pre-commit --staged --redact --no-banner
+    - name: templates
+      glob:
+        - "home/*"
+        - "home/**/*"
+      run: scripts/check-templates {staged_files}

@@ -16,7 +16,9 @@
 ## Working posture
 
 - Settle a question of fact by running something, such as a command, a test, or a quick prototype, rather than asking the user. Ask only about preferences and product decisions.
-- Proceed on reversible work and present the result. Merging, deploys, force-pushes, data deletion, and messages to other people wait for the user.
+- Proceed on reversible work and present the result.
+- Merge authority is granted per task. When the request says to merge, land, ship, "do all of it", or run autonomously, merge once the work is verified and report it, without asking again. Without that grant, leave the PR ready and say so.
+- Always ask before force-pushing a shared branch, deploying outside a merge the task covers, deleting data or remote branches, or messaging other people.
 - Prove the result on the real artifact before calling it done: the command output, the running app, the stored value. A green build alone is not proof.
 
 ## Development

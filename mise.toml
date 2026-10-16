@@ -1,0 +1,7 @@
+# Tools for working on this repository, not for the machines it configures:
+# chezmoi reads only home/ (.chezmoiroot), so nothing here is applied.
+# Run `mise install && lefthook install` once per clone.
+[tools]
+lefthook = "2.2.2"
+gitleaks = "8.30.1"
+shellcheck = "0.11.0"

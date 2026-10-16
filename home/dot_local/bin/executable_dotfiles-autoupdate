@@ -75,7 +75,11 @@ fi
 git -C "$repo" merge --ff-only "origin/$branch" >>"$log_file" 2>&1 || true
 
 status=0
-chezmoi apply >>"$log_file" 2>&1 || status=$?
+# --keep-going: one failing installer must not stop every script after it (a
+# 404 from one vendor kept devbox-gpu from applying anything for two days).
+# chezmoi does not record a failed run_onchange script, so it is retried on
+# the next run, and the non-zero status still lands in the log.
+chezmoi apply --keep-going >>"$log_file" 2>&1 || status=$?
 printf '=== %s exit %d ===\n' "$(timestamp)" "$status" >>"$log_file"
 
 # Homebrew formulae are the one part of the toolchain deliberately left rolling:

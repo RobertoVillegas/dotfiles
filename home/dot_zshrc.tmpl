@@ -52,6 +52,20 @@ command -v fzf >/dev/null 2>&1 && source <(fzf --zsh)
 {{ if and (eq .chezmoi.os "darwin") (eq .role "workstation") -}}
 export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
 [[ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ]] && alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+
+# The workstation has no dotfiles-autoupdate: its checkout is where the work
+# happens, often on a feature branch. Say when it has fallen behind instead.
+# The check runs in the background at most hourly; the next shell shows it.
+_dotfiles_drift="$HOME/.cache/dotfiles-drift"
+[[ -s "$_dotfiles_drift" ]] &&
+  print -P "%F{yellow}dotfiles: $(<"$_dotfiles_drift") not applied. Review with chezmoi diff, then chezmoi apply.%f"
+if [[ ! -f "$_dotfiles_drift" || -n "$(find "$_dotfiles_drift" -mmin +60 2>/dev/null)" ]]; then
+  (
+    n="$(chezmoi status --exclude=scripts 2>/dev/null | wc -l | tr -d ' ')"
+    if [[ "$n" -gt 0 ]]; then print "$n targets" >"$_dotfiles_drift"; else : >"$_dotfiles_drift"; fi
+  ) &!
+fi
+unset _dotfiles_drift
 {{ end -}}
 
 alias ls="eza"

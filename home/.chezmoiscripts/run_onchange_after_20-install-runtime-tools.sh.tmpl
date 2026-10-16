@@ -24,6 +24,15 @@ cd "$HOME"
 mise install node pnpm bun
 mise install
 
+{{- if eq .profile "dev" }}
+# Installs or updates the tool-update service declared in config.local.toml.
+# launchd refuses a gui/ agent from an SSH session; the next apply from
+# dotfiles-autoupdate, which runs inside the login session, loads it.
+if ! mise bootstrap services apply; then
+  echo "warn: could not apply mise bootstrap services; run 'mise bootstrap services apply' from a desktop session" >&2
+fi
+{{- end }}
+
 export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
 export PATH="$MISE_DATA_DIR/shims:$PATH"
 

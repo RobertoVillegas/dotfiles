@@ -1,8 +1,7 @@
 {{- if eq .profile "dev" -}}
 # First-party agent CLIs that stay on their newest release instead of a pin
 # (the same ones config.toml exempts from minimum_release_age). auto_update has
-# mise check once a day and upgrade them in the background at the next shell
-# prompt, so two machines may be up to a day apart.
+# mise check them once a day, so two machines may be up to a day apart.
 #
 # They live here rather than in config.toml because each config file locks into
 # the lockfile beside it. An update rewrites the lock entry, and in mise.lock,
@@ -11,4 +10,14 @@
 [tools]
 "npm:@earendil-works/pi-coding-agent" = { version = "latest", auto_update = true }
 "npm:@openai/codex" = { version = "latest", auto_update = true }
+
+# The tool-update service runs the daily check from a LaunchAgent or systemd user
+# unit, so a devbox nobody opens a shell on stays current too. While it runs,
+# shims and prompts leave updates to it. That matters: in mise 2026.10.11 a check
+# claimed by a shim launch re-runs `__tool-update` through the same shim, so the
+# tool itself receives those arguments, exits 2, and the day's check is spent
+# without an update. herdr's integration script launches codex that way.
+# On Linux it needs lingering (`loginctl enable-linger`) to run without a login.
+[bootstrap.services.mise-tool-update]
+builtin = "tool-update"
 {{- end }}

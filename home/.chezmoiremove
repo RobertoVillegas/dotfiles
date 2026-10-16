@@ -14,3 +14,10 @@
 .local/bin/python
 .local/bin/python3
 {{ end }}
+
+{{/* The agent context moved to ~/.config/agents/AGENTS.md so workstations get
+     it too; the four agent symlinks point there now. */}}
+.config/devbox/AGENT_CONTEXT.md
+
+{{/* grill-me was a one-line alias for grilling (dotagents), which covers it. */}}
+.agents/skills/grill-me

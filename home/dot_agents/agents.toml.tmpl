@@ -34,14 +34,13 @@ github_repos = [
   "mattpocock/skills",
   "upstash/context7",
   "vercel-labs/skills",
-  "stablyai/orca",
 {{- if eq .role "devbox" }}
   "vercel-labs/agent-browser",
 {{- end }}
 ]
 
-# mattpocock/skills, used unmodified. grill-me and wait-what are local
-# adaptations of the same repository and stay personal.
+# mattpocock/skills, used unmodified. wait-what is a local
+# adaptation of the same repository and stay personal.
 [[skills]]
 name = "diagnosing-bugs"
 source = "mattpocock/skills"
@@ -65,10 +64,6 @@ source = "upstash/context7"
 [[skills]]
 name = "find-skills"
 source = "vercel-labs/skills"
-
-[[skills]]
-name = "orchestration"
-source = "stablyai/orca"
 {{- if eq .role "devbox" }}
 
 # The devbox runs the browser; the workstation has its own browser tooling.

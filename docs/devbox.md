@@ -28,10 +28,9 @@ on native Linux the official systemd user service is installed once. Pairing,
 Tailscale Serve, projects, and Git workspace policy require deliberate setup and
 are documented in [T3 Code](t3-code.md).
 
-Herdr is the persistent terminal runtime on the devbox. Orca Desktop stays
-installed on both hosts, but the workstation runtime is authoritative and
-reaches devbox projects over SSH. The dotfiles intentionally do not run a
-second `orca serve` process on the headless Mac.
+T3 Code is the main way agents are driven, and Herdr is the persistent terminal
+runtime on the devbox. Orca is no longer installed; a host that still has the
+app keeps it until it is removed by hand.
 
 The CLI toolbox includes Fastfetch, bottom, btop, dust, duf, procs, just,
 Watchexec, Hyperfine, yq, ShellCheck, shfmt, Git LFS, and tealdeer. LazyGit and
@@ -251,11 +250,10 @@ the shared devbox policy through `~/.pi/agent/AGENTS.md`.
 - `herdr` teaches agents to inspect and control Herdr only from a managed pane.
 - `find-skills` searches the public agent-skills ecosystem.
 - `find-docs` is Context7's official documentation lookup workflow.
-- `grill-me`, `grilling`, `wait-what`, `diagnosing-bugs`, `prototype`, and
-  `writing-for-agents` are Matt Pocock's workflows (`grill-me` and `wait-what`
+- `grilling`, `wait-what`, `diagnosing-bugs`, `prototype`, and
+  `writing-for-agents` are Matt Pocock's workflows (`wait-what`
   locally adapted).
-- `show-me` provides portable visual explanations, and `orchestration` connects
-  agents to the Orca coordination guide when the Orca runtime is available.
+- `show-me` provides portable visual explanations.
 - `agent-browser` and `devbox-network` cover browser automation and leased,
   private service exposure.
 

@@ -31,19 +31,44 @@ Personal (chezmoi):
 | --- | --- |
 | `devbox-network` | written for these devboxes (devbox only) |
 | `herdr` | the output of `herdr --skill` for the pinned Herdr binary |
-| `grill-me` | `mattpocock/skills`, adapted: model-invocable, links to `grilling` by path |
-| `wait-what` | `mattpocock/skills`, adapted: model-invocable, explicit trigger |
+| `wait-what` | `mattpocock/skills`, rewritten: plain re-explanation in the conversation's language |
 | `show-me` | `humanlayer/skills`, adapted: no macOS `open`, model-invocable |
 | `pr-description` | personal PR-writing workflow: problem, behavior, evidence, and rollout; optional `show-me` diagrams |
 
 Third-party (dotagents): `diagnosing-bugs`, `grilling`, `prototype`, and
 `writing-for-agents` from `mattpocock/skills`; `find-docs` from
-`upstash/context7`; `find-skills` from `vercel-labs/skills`; `orchestration` from
-`stablyai/orca`; and, on devboxes only, `agent-browser` from
-`vercel-labs/agent-browser`.
+`upstash/context7`; `find-skills` from `vercel-labs/skills`; and, on devboxes
+only, `agent-browser` from `vercel-labs/agent-browser`.
 
 An adapted copy is a fork, so it stays personal. Declaring it in dotagents would
 replace the adaptation with upstream on the next install.
+
+## pstack (Pi only)
+
+[pstack](https://github.com/cursor/plugins/tree/main/pstack) is installed apart
+from everything above, because only Pi should load it. It is a second dotagents
+project at `~/.pi/agent/pstack`:
+
+```text
+chezmoi apply
+  ├── ~/.pi/agent/pstack/{agents.toml,PI.md}        (chezmoi)
+  ├── ~/.pi/agent/prompts/poteto-mode.md            (chezmoi)  → /poteto-mode
+  ├── ~/.cursor/rules/pstack-models.mdc             (chezmoi)  model per role
+  └── run_after_33-install-pstack
+        ├── dotagents --project install → ~/.pi/agent/pstack/.agents/skills
+        ├── Pi settings.json `skills` += "pstack/.agents/skills"
+        └── ~/.pi/agent/agents/{poteto-agent,comment-sicko}.md, built from
+            pstack/agents/ at the commit dotagents resolved
+```
+
+- `PI.md` maps pstack's Cursor tools (`Task`, `AskQuestion`, Custom Mode,
+  transcripts, `/deslop`) onto Pi and pi-subagents. Every pstack prompt reads it
+  first.
+- The models rule lives at Cursor's path because the skills read it from there.
+  Every role runs Claude Opus 5.5.
+- `poteto-mode` declares `name: Poteto Mode`. dotagents' wildcard skips that
+  name, so the manifest lists it explicitly, and Pi cannot reach it through
+  `/skill:`, which is why the `/poteto-mode` prompt template exists.
 
 ## Versions follow upstream
 
@@ -86,8 +111,8 @@ it), remove its entry first, apply, then add the adapted copy under
 
 The install is skipped unless `~/.agents/agents.toml` or the dotagents version
 changed, or the last successful install is over 20 hours old: dotagents fetches
-every source on each install, and `stablyai/orca` moves so often that it
-refetches its whole history each time. The stamp lives in
+every source on each install, and a busy source whose newest commit is nearly
+always inside the release-age window refetches its whole history each time. The stamp lives in
 `~/.local/state/dotfiles/agent-skills-installed`. Relinking for Claude runs on
 every apply.
 

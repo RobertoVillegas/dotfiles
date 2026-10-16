@@ -193,7 +193,7 @@ regresan por la tailnet.
  │ Workstation (mac)   │                            │            H E R D R                          │
  │   terminal · IDE    │                            │   runtime de terminal persistente             │
  │   browser           │       Tailscale (VPN)      │                                               │
- │   Orca (orquesta) ──┼──┐                         │   ┌────────┐  ┌────────┐  ┌────────┐   panes   │
+ │   T3 Code ──────────┼──┐                         │   ┌────────┐  ┌────────┐  ┌────────┐   panes   │
  └─────────────────────┘  │   ssh                   │   │ Claude │  │ Codex  │  │OpenCode│           │
                           ├════════════════════════▶│   │  Code  │  │        │  │        │           │
  ┌─────────────────────┐  │                         │   └───┬────┘  └────────┘  └────────┘           │

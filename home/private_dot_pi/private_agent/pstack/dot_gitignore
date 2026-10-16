@@ -1,0 +1,3 @@
+# dotagents expects these out of version control; they are machine state.
+agents.lock
+.agents/.gitignore

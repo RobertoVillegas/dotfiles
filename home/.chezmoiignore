@@ -28,13 +28,11 @@ Library/Preferences
 .config/worktrunk
 {{ end }}
 
-{{ if or (ne .profile "dev") (ne .role "devbox") }}
-.pi/agent/AGENTS.md
-{{ end }}
-
 {{ if ne .profile "dev" }}
+.config/agents
 .config/devbox
 .config/opencode
+.cursor
 .agents
 .claude
 .codex
@@ -45,10 +43,7 @@ Library/Preferences
 .config/ghostty
 {{ else }}
 .config/devbox
-.config/opencode
 .agents/skills/devbox-network
-.claude/CLAUDE.md
-.codex
 .local
 {{ end }}
 
@@ -80,6 +75,10 @@ Library/Preferences
      makes `chezmoi add` refuse them, so a stray add cannot commit a token. */}}
 .agents/agents.lock
 .agents/.skill-lock.json
+.pi/agent/pstack/.agents
+.pi/agent/pstack/agents.lock
+.pi/agent/agents/poteto-agent.md
+.pi/agent/agents/comment-sicko.md
 .pi/agent/auth.json
 .pi/agent/models.json
 .pi/agent/models-store.json

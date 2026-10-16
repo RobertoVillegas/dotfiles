@@ -1,0 +1,25 @@
+---
+description: pstack per-role model choices (overrides skill defaults)
+alwaysApply: true
+---
+# pstack model configuration. One line per role. Delete a line to fall back to the skill default.
+# `inherit-parent` or `auto` as a value: the role runs on the parent chat model (omit Task `model`). Alias entries in a panel list still count toward its fan-out.
+# Managed by chezmoi for Pi, not written by /setup-pstack. Every role runs Claude Opus 5.5; ~/.pi/agent/pstack/PI.md says how a slug maps to a Pi subagent model and thinking level.
+# budget: large (xhigh)
+feature, refactoring: claude-opus-5-5-xhigh
+bug-fix: claude-opus-5-5-xhigh
+perf-issue: claude-opus-5-5-xhigh
+hillclimb: claude-opus-5-5-xhigh
+judgment and prose: claude-opus-5-5-xhigh
+hardest tasks: claude-opus-5-5-xhigh
+how explorer: claude-opus-5-5-xhigh
+how explainer: claude-opus-5-5-xhigh
+why investigators: claude-opus-5-5-xhigh
+why synthesizer: claude-opus-5-5-xhigh
+reflect tooling: claude-opus-5-5-xhigh
+reflect judgment, divergent, synthesizer: claude-opus-5-5-xhigh
+arena runners: claude-opus-5-5-xhigh, claude-opus-5-5-xhigh
+arena cross-judge pool: claude-opus-5-5-xhigh
+swarm workers: claude-opus-5-5-xhigh
+architect runners: claude-opus-5-5-xhigh, claude-opus-5-5-xhigh
+interrogate reviewers: claude-opus-5-5-xhigh, claude-opus-5-5-xhigh

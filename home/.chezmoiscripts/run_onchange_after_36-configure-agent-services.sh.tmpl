@@ -12,9 +12,8 @@ export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/opt/homebrew/bin:/usr/bin:/b
 {{ if eq .chezmoi.os "darwin" -}}
 uid="$(id -u)"
 
-# Retire the failed headless Orca runtime. Orca Desktop remains installed; its
-# workstation runtime reaches this host through SSH while Herdr owns persistent
-# devbox terminals.
+# Retire the headless Orca runtime from hosts that still have it. Orca is no
+# longer installed; Herdr owns persistent devbox terminals.
 for domain in "gui/$uid" "user/$uid"; do
   launchctl bootout "$domain/local.orca-serve" 2>/dev/null || true
 done

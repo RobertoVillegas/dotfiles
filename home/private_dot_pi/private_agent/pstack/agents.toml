@@ -1,0 +1,35 @@
+# pstack (github.com/cursor/plugins/tree/main/pstack), for Pi only.
+#
+# A dotagents project of its own rather than an entry in ~/.agents/agents.toml:
+# that directory is read by Codex and OpenCode too, and pstack is meant for Pi.
+# run_after_33-install-pstack installs it into ./.agents/skills, adds that
+# directory to Pi's `skills` setting, and builds the two pstack subagents from
+# the same commit. PI.md, next to this file, maps pstack's Cursor tools onto Pi.
+#
+# Follows upstream with no `ref`, like the other third-party skills, behind the
+# same four-hour release-age window.
+version = 1
+
+# Nothing to link: Pi reads the directory through its `skills` setting.
+agents = []
+
+minimum_release_age = 240
+
+[trust]
+github_repos = ["cursor/plugins"]
+
+# Every pstack skill, including ones added upstream later. setup-pstack writes
+# Cursor's model rule from Cursor's model list; ~/.cursor/rules/pstack-models.mdc
+# is managed by chezmoi instead. make-bot-ui drives Grok Bot, which we don't use.
+[[skills]]
+name = "*"
+source = "cursor/plugins"
+path = "pstack/skills"
+exclude = ["make-bot-ui", "setup-pstack"]
+
+# The wildcard silently skips poteto-mode: its frontmatter name is "Poteto Mode",
+# which dotagents rejects. An explicit entry with a path installs it.
+[[skills]]
+name = "poteto-mode"
+source = "cursor/plugins"
+path = "pstack/skills/poteto-mode"

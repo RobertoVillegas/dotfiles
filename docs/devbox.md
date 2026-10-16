@@ -250,8 +250,8 @@ the shared devbox policy through `~/.pi/agent/AGENTS.md`.
 - `herdr` teaches agents to inspect and control Herdr only from a managed pane.
 - `find-skills` searches the public agent-skills ecosystem.
 - `find-docs` is Context7's official documentation lookup workflow.
-- `grill-me`, `grilling`, `wait-what`, `diagnosing-bugs`, `prototype`, and
-  `writing-for-agents` are Matt Pocock's workflows (`grill-me` and `wait-what`
+- `grilling`, `wait-what`, `diagnosing-bugs`, `prototype`, and
+  `writing-for-agents` are Matt Pocock's workflows (`wait-what`
   locally adapted).
 - `show-me` provides portable visual explanations.
 - `agent-browser` and `devbox-network` cover browser automation and leased,

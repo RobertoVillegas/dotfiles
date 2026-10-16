@@ -54,7 +54,7 @@ Use a concrete title naming the affected behavior and follow the repository's co
 
 Read as a reviewer: can you identify the problem, reason for the fix, preserved behavior, rollout requirements, and actual verification? Remove empty headings. Preserve the user's voice instead of producing an agent activity report.
 
-Only create or update a PR when authorized. Verify the target repository/base, head branch, GitHub account, and requested commit identity. A requested commit name/email does not change the GitHub account authoring the PR. Include model/harness disclosure when the repository or user requires it, using actual tools rather than copied attribution.
+Open or update the PR when the work is ready; merging it waits for the user. Verify the target repository/base, head branch, GitHub account, and requested commit identity. A requested commit name/email does not change the GitHub account authoring the PR. Include model/harness disclosure when the repository or user requires it, using actual tools rather than copied attribution.
 
 After publication, read back the title, body, target, and URL. Report publication separately from merge, CI success, deployment, or skill installation.
 

@@ -28,11 +28,8 @@ Library/Preferences
 .config/worktrunk
 {{ end }}
 
-{{ if or (ne .profile "dev") (ne .role "devbox") }}
-.pi/agent/AGENTS.md
-{{ end }}
-
 {{ if ne .profile "dev" }}
+.config/agents
 .config/devbox
 .config/opencode
 .cursor
@@ -46,10 +43,7 @@ Library/Preferences
 .config/ghostty
 {{ else }}
 .config/devbox
-.config/opencode
 .agents/skills/devbox-network
-.claude/CLAUDE.md
-.codex
 .local
 {{ end }}
 

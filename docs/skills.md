@@ -31,8 +31,7 @@ Personal (chezmoi):
 | --- | --- |
 | `devbox-network` | written for these devboxes (devbox only) |
 | `herdr` | the output of `herdr --skill` for the pinned Herdr binary |
-| `grill-me` | `mattpocock/skills`, adapted: model-invocable, links to `grilling` by path |
-| `wait-what` | `mattpocock/skills`, adapted: model-invocable, explicit trigger |
+| `wait-what` | `mattpocock/skills`, rewritten: plain re-explanation in the conversation's language |
 | `show-me` | `humanlayer/skills`, adapted: no macOS `open`, model-invocable |
 | `pr-description` | personal PR-writing workflow: problem, behavior, evidence, and rollout; optional `show-me` diagrams |
 

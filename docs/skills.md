@@ -45,6 +45,33 @@ Third-party (dotagents): `diagnosing-bugs`, `grilling`, `prototype`, and
 An adapted copy is a fork, so it stays personal. Declaring it in dotagents would
 replace the adaptation with upstream on the next install.
 
+## pstack (Pi only)
+
+[pstack](https://github.com/cursor/plugins/tree/main/pstack) is installed apart
+from everything above, because only Pi should load it. It is a second dotagents
+project at `~/.pi/agent/pstack`:
+
+```text
+chezmoi apply
+  ├── ~/.pi/agent/pstack/{agents.toml,PI.md}        (chezmoi)
+  ├── ~/.pi/agent/prompts/poteto-mode.md            (chezmoi)  → /poteto-mode
+  ├── ~/.cursor/rules/pstack-models.mdc             (chezmoi)  model per role
+  └── run_after_33-install-pstack
+        ├── dotagents --project install → ~/.pi/agent/pstack/.agents/skills
+        ├── Pi settings.json `skills` += "pstack/.agents/skills"
+        └── ~/.pi/agent/agents/{poteto-agent,comment-sicko}.md, built from
+            pstack/agents/ at the commit dotagents resolved
+```
+
+- `PI.md` maps pstack's Cursor tools (`Task`, `AskQuestion`, Custom Mode,
+  transcripts, `/deslop`) onto Pi and pi-subagents. Every pstack prompt reads it
+  first.
+- The models rule lives at Cursor's path because the skills read it from there.
+  Every role runs Claude Opus 5.5.
+- `poteto-mode` declares `name: Poteto Mode`. dotagents' wildcard skips that
+  name, so the manifest lists it explicitly, and Pi cannot reach it through
+  `/skill:`, which is why the `/poteto-mode` prompt template exists.
+
 ## Versions follow upstream
 
 Third-party sources carry no `ref`. Each install takes the newest upstream

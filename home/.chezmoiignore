@@ -35,6 +35,7 @@ Library/Preferences
 {{ if ne .profile "dev" }}
 .config/devbox
 .config/opencode
+.cursor
 .agents
 .claude
 .codex
@@ -80,6 +81,10 @@ Library/Preferences
      makes `chezmoi add` refuse them, so a stray add cannot commit a token. */}}
 .agents/agents.lock
 .agents/.skill-lock.json
+.pi/agent/pstack/.agents
+.pi/agent/pstack/agents.lock
+.pi/agent/agents/poteto-agent.md
+.pi/agent/agents/comment-sicko.md
 .pi/agent/auth.json
 .pi/agent/models.json
 .pi/agent/models-store.json

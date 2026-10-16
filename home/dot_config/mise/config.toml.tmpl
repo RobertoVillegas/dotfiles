@@ -54,6 +54,11 @@ npm.shell_out = true
 # the resolved download URLs, which keeps installs off the GitHub API.
 lockfile = true
 lockfile_platforms = ["macos-arm64", "linux-x64"]
+# Every profile shares this one lockfile, but rust and flatc are installed only
+# where there is a GPU. With pruning on, mise drops their entries on the other
+# machines, chezmoi sees the lockfile changed under it, and the unattended
+# apply aborts on its overwrite prompt.
+lockfile_auto_prune = false
 # Refuse versions published in the last 4 hours. A poisoned release is usually
 # yanked within hours; 4 hours covers the fastest takedowns while letting dev
 # tooling pick up a fresh release the same day, which 24 hours kept blocking.

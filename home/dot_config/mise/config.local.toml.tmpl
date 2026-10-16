@@ -1,0 +1,14 @@
+{{- if eq .profile "dev" -}}
+# First-party agent CLIs that stay on their newest release instead of a pin
+# (the same ones config.toml exempts from minimum_release_age). auto_update has
+# mise check once a day and upgrade them in the background at the next shell
+# prompt, so two machines may be up to a day apart.
+#
+# They live here rather than in config.toml because each config file locks into
+# the lockfile beside it. An update rewrites the lock entry, and in mise.lock,
+# which chezmoi manages, the next apply would roll it back. This file locks into
+# mise.local.lock instead, which stays on the machine.
+[tools]
+"npm:@earendil-works/pi-coding-agent" = { version = "latest", auto_update = true }
+"npm:@openai/codex" = { version = "latest", auto_update = true }
+{{- end }}

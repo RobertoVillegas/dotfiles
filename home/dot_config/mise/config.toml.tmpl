@@ -27,11 +27,10 @@ flatc = "25.12.19"
 # resolves "latest" when a machine first installs the tool, so two devboxes set
 # up on different days silently end up on different versions. Bump these by
 # hand when an upgrade is actually wanted.
+# Codex and Pi are the exception and update themselves: see config.local.toml.
 herdr = "0.9.3"
 worktrunk = "0.77.0"
-"npm:@earendil-works/pi-coding-agent" = "1.0.3"
 "npm:@fission-ai/openspec" = "1.13.0"
-"npm:@openai/codex" = "0.160.0"
 # Shared QMD executable; Pi and Hermes keep separate named collections.
 # Third-party Agent Skills; the manifest is ~/.agents/agents.toml.
 "npm:@sentry/dotagents" = "3.3.0"

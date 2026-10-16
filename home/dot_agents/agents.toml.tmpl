@@ -34,7 +34,6 @@ github_repos = [
   "mattpocock/skills",
   "upstash/context7",
   "vercel-labs/skills",
-  "stablyai/orca",
 {{- if eq .role "devbox" }}
   "vercel-labs/agent-browser",
 {{- end }}
@@ -65,10 +64,6 @@ source = "upstash/context7"
 [[skills]]
 name = "find-skills"
 source = "vercel-labs/skills"
-
-[[skills]]
-name = "orchestration"
-source = "stablyai/orca"
 {{- if eq .role "devbox" }}
 
 # The devbox runs the browser; the workstation has its own browser tooling.

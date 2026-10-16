@@ -19,7 +19,7 @@ if ! command -v dotagents >/dev/null 2>&1; then
 fi
 
 # dotagents cannot tell it is up to date: every install fetches every source,
-# and a busy one like stablyai/orca, whose newest commit is nearly always
+# and a busy one, whose newest commit is nearly always
 # inside the release-age window, refetches its whole history to find an older
 # one. So it only runs when the manifest or dotagents changed, or when the last
 # successful install is over 20 hours old, which the daily autoupdate always

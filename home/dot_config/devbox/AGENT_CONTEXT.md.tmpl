@@ -6,7 +6,6 @@
 - The user connects remotely through Tailscale from another computer or mobile device.
 - Keep browsers, design tools, database GUIs, music, and other desktop applications on the client device.
 - Do not open GUI applications on this host unless explicitly requested.
-- Use existing Herdr sessions for persistent projects and agents when practical.
 
 ## Development
 
@@ -20,15 +19,15 @@
 
 ## Agent runtimes
 
-- Use Herdr for persistent terminal work on this host.
-- Use Orca only for explicitly requested structured orchestration. Orca and Herdr must not own the same terminal, process, or writable checkout.
-- Control a Herdr or Orca session only from the runtime context exported to the current agent.
+- The user drives agents mainly through T3 Code, which runs on this host and is reached from client devices over the tailnet. T3 owns its projects, threads, and terminals.
+- Herdr is for independent persistent terminal work outside T3, such as long-lived processes and the occasional agent session.
+- T3 and Herdr must not own the same terminal, process, or writable checkout. Control a Herdr session only from the runtime context exported to the current agent.
 
-## pstack in Pi
+## Working posture
 
-- Pi has pstack, Cursor's rigorous workflow skills. `/poteto-mode <goal and how to tell it's done>` routes a task to its playbook.
-- `~/.pi/agent/pstack/PI.md` maps pstack's Cursor tools onto Pi. Read it before any pstack skill.
-- Follow pstack's posture: settle facts by running something rather than asking, proceed on reversible work, and prove the result on the real artifact. Merging, deploys, force-pushes, data deletion, and messages to other people still wait for the user.
+- Settle a question of fact by running something, such as a command, a test, or a quick prototype, rather than asking the user. Ask only about preferences and product decisions.
+- Proceed on reversible work and present the result. Merging, deploys, force-pushes, data deletion, and messages to other people wait for the user.
+- Prove the result on the real artifact before calling it done: the command output, the running app, the stored value. A green build alone is not proof.
 
 ## Networking
 

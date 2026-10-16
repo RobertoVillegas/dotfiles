@@ -38,9 +38,8 @@ Personal (chezmoi):
 
 Third-party (dotagents): `diagnosing-bugs`, `grilling`, `prototype`, and
 `writing-for-agents` from `mattpocock/skills`; `find-docs` from
-`upstash/context7`; `find-skills` from `vercel-labs/skills`; `orchestration` from
-`stablyai/orca`; and, on devboxes only, `agent-browser` from
-`vercel-labs/agent-browser`.
+`upstash/context7`; `find-skills` from `vercel-labs/skills`; and, on devboxes
+only, `agent-browser` from `vercel-labs/agent-browser`.
 
 An adapted copy is a fork, so it stays personal. Declaring it in dotagents would
 replace the adaptation with upstream on the next install.
@@ -113,8 +112,8 @@ it), remove its entry first, apply, then add the adapted copy under
 
 The install is skipped unless `~/.agents/agents.toml` or the dotagents version
 changed, or the last successful install is over 20 hours old: dotagents fetches
-every source on each install, and `stablyai/orca` moves so often that it
-refetches its whole history each time. The stamp lives in
+every source on each install, and a busy source whose newest commit is nearly
+always inside the release-age window refetches its whole history each time. The stamp lives in
 `~/.local/state/dotfiles/agent-skills-installed`. Relinking for Claude runs on
 every apply.
 

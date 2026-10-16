@@ -114,12 +114,10 @@ cask "orbstack"
 {{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") (eq .role "devbox") }}
 
 # Headless macOS host. Tailscale and OrbStack still have app bundles, but no
-# workstation applications are installed. Herdr owns persistent terminals;
-# Orca stays available for clients and SSH-managed workflows without running a
-# second headless runtime on this host.
+# workstation applications are installed. T3 Code is the main agent surface
+# and Herdr owns persistent terminals.
 cask "tailscale-app"
 cask "t3-code@nightly"
-cask "stablyai/orca/orca", trusted: true
 {{- if or (eq .container "auto") (eq .container "orbstack") }}
 cask "orbstack"
 {{- end }}
@@ -141,7 +139,6 @@ cask "cap"
 cask "cleanshot"
 cask "cryptomator"
 cask "discord"
-cask "stablyai/orca/orca", trusted: true
 cask "reflex-app"
 cask "rocket"
 cask "scroll-reverser"

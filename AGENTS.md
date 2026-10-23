@@ -25,7 +25,7 @@ chezmoi source for the user's workstation and devboxes. chezmoi reads only `home
 
 - One owner per file. A third-party skill comes from `home/dot_agents/agents.toml.tmpl` (dotagents). A personal or adapted skill lives in `home/dot_agents/skills/`. Never both. pstack is Pi-only and lives in `home/private_dot_pi/private_agent/pstack/`. See `docs/skills.md`.
 - Edit the chezmoi source, never the target. `dotagents add` and `chezmoi add` on a managed path write to the target, and the next apply reverts them.
-- Files that keep state, credentials, or tokens are listed in `home/.chezmoiignore` so `chezmoi add` refuses them. Keep that list in step with new tools.
+- Files that keep state, credentials, or tokens are listed in `home/.chezmoiignore` so `chezmoi add` refuses them. Keep that list in step with new tools. `docs/pi-models.md` documents the provider-key convention behind `.config/pi/**`.
 
 ## Versions
 

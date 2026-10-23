@@ -32,6 +32,7 @@ minimum_release_age = 240
 [trust]
 github_repos = [
   "mattpocock/skills",
+  "nutlope/hallmark",
   "upstash/context7",
   "vercel-labs/skills",
 {{- if eq .role "devbox" }}
@@ -56,6 +57,13 @@ source = "mattpocock/skills"
 [[skills]]
 name = "writing-for-agents"
 source = "mattpocock/skills"
+
+# Design builds and redesigns. Its install-hook.mjs would write a PostToolUse
+# hook into ~/.claude/settings.json; do not run it, a hook belongs in this repo.
+# imagegen.mjs only calls Together AI when TOGETHER_API_KEY is set.
+[[skills]]
+name = "hallmark"
+source = "nutlope/hallmark"
 
 [[skills]]
 name = "find-docs"

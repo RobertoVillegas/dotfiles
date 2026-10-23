@@ -254,6 +254,8 @@ the shared devbox policy through `~/.pi/agent/AGENTS.md`.
   `writing-for-agents` are Matt Pocock's workflows (`wait-what`
   locally adapted).
 - `show-me` provides portable visual explanations.
+- `hallmark` builds new pages and, when named, redesigns or audits existing
+  ones against a list of AI-generated design tells.
 - `agent-browser` and `devbox-network` cover browser automation and leased,
   private service exposure.
 

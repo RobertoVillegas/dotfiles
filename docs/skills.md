@@ -36,9 +36,10 @@ Personal (chezmoi):
 | `pr-description` | personal PR-writing workflow: problem, behavior, evidence, and rollout; optional `show-me` diagrams |
 
 Third-party (dotagents): `diagnosing-bugs`, `grilling`, `prototype`, and
-`writing-for-agents` from `mattpocock/skills`; `find-docs` from
-`upstash/context7`; `find-skills` from `vercel-labs/skills`; and, on devboxes
-only, `agent-browser` from `vercel-labs/agent-browser`.
+`writing-for-agents` from `mattpocock/skills`; `hallmark` from
+`nutlope/hallmark`; `find-docs` from `upstash/context7`; `find-skills` from
+`vercel-labs/skills`; and, on devboxes only, `agent-browser` from
+`vercel-labs/agent-browser`.
 
 An adapted copy is a fork, so it stays personal. Declaring it in dotagents would
 replace the adaptation with upstream on the next install.

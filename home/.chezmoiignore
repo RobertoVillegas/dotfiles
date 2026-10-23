@@ -88,10 +88,11 @@ Library/Preferences
 .claude-*
 .pi/agent/claude-accounts-state.json
 .claude-accounts
-{{/* Provider API keys read by models.json through "!cat" (refuseless, yeta,
-     ...) live beside the config. No template provides this path and it holds
-     only secrets, so listing it makes an accidental `chezmoi add` refuse
-     instead of committing a key. */}}
+{{/* Provider API keys (refuseless, yeta, ...) that models.json reads through
+     its "!" apiKey command, after the provider's environment variable. No
+     template provides this path and it holds only secrets, so listing it
+     makes an accidental `chezmoi add` refuse instead of committing a key.
+     See docs/pi-models.md. */}}
 .config/pi/**
 {{/* T3 keeps tokens, sessions and databases under ~/.t3; only its settings
      file is managed (modify_settings.json). */}}

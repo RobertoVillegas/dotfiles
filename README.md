@@ -178,6 +178,10 @@ devbox-doctor
 La instalación, pairing por Tailscale y política de checkouts de T3 están en la
 [guía de T3 Code](docs/t3-code.md).
 
+Los providers de Pi que no vienen en el catálogo, y las API keys que usan, se
+configuran por máquina siguiendo la [guía de modelos de Pi](docs/pi-models.md):
+`models.json` y los archivos de `~/.config/pi` no se versionan.
+
 ### Flujo remoto
 
 Trabajas en el devbox desde la workstation o el móvil sobre Tailscale: las

@@ -82,9 +82,11 @@ Library/Preferences
 .pi/agent/auth.json
 .pi/agent/models.json
 {{/* MCP OAuth tokens written by `pi mcp login`. mcp.json itself is managed:
-     it holds only server URLs, so every host gets the same servers and signs
-     in to each one locally. */}}
+     it holds server URLs and references to keys, never the keys. */}}
 .pi/agent/mcp-auth.json
+{{/* Executor API key, read by the Authorization header in ~/.pi/agent/mcp.json.
+     See docs/pi-mcp.md. */}}
+.config/executor/**
 .pi/agent/models-store.json
 .pi/agent/sessions
 .claude/.credentials.json

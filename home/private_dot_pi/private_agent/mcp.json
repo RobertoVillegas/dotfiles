@@ -1,7 +1,10 @@
 {
   "mcpServers": {
     "executor": {
-      "url": "https://executor.roberto.lol/mcp?search_tools=true"
+      "url": "https://executor.roberto.lol/mcp?search_tools=true",
+      "headers": {
+        "Authorization": "!printf 'Bearer %s' \"${EXECUTOR_PI_API_KEY:-$(cat \"$HOME/.config/executor/pi.key\" 2>/dev/null)}\""
+      }
     }
   }
 }

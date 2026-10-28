@@ -21,3 +21,6 @@
 
 {{/* grill-me was a one-line alias for grilling (dotagents), which covers it. */}}
 .agents/skills/grill-me
+
+{{/* pi-fabric was removed from the Pi packages; its global settings went with it. */}}
+.pi/agent/fabric.json

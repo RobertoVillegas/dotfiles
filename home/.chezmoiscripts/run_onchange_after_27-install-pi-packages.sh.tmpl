@@ -27,7 +27,6 @@ packages=(
   npm:pi-web-access@0.35.0
   npm:pi-subagents@0.74.0
   npm:@narumitw/pi-goal@0.54.8
-  npm:pi-fabric@0.104.0
   npm:pi-memory@0.4.2
   npm:@trevonistrevon/pi-loop@0.7.15
   npm:@vanillagreen/pi-claude-bridge@4.0.8
@@ -57,6 +56,11 @@ obsolete_packages=(
   # alias), about 250 entries that buried the Claude models in T3's picker.
   # T3 Code has its own Cursor provider for when Cursor is wanted.
   npm:pi-cursor-sdk
+  # Hid Pi's core tools and native codemode behind fabric_exec, and reached MCP
+  # through its own mcporter layer instead of mcp.json, so servers configured
+  # in Pi were invisible to the model. Pi 1.4 ships codemode, tool_search and
+  # parallel scripts natively; pi-subagents covers delegation.
+  npm:pi-fabric
 )
 
 settings="$HOME/.pi/agent/settings.json"

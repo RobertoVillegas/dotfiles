@@ -90,7 +90,6 @@ for pi_package in \
   npm:pi-web-access \
   npm:pi-subagents \
   npm:@narumitw/pi-goal \
-  npm:pi-fabric \
   npm:pi-memory \
   npm:@trevonistrevon/pi-loop \
   npm:@vanillagreen/pi-claude-bridge \

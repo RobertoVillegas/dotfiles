@@ -8,7 +8,6 @@ dotfiles, one file per machine, like the provider keys in
 | File | Holds | In the dotfiles |
 | --- | --- | --- |
 | `~/.pi/agent/mcp.json` | server URLs and how each reads its key | yes |
-| `~/.pi/agent/fabric.json` | Fabric settings; only `mcp.nativeServers` is managed | partly (`modify_fabric.json`) |
 | `~/.config/executor/pi.key` | the Executor API key, mode 600 | never |
 | `~/.pi/agent/mcp-auth.json` | OAuth tokens from `pi mcp login` | never |
 
@@ -50,14 +49,12 @@ shell history or the process list:
 pbpaste | tr -d '[:space:]' | ssh devbox 'install -d -m 700 ~/.config/executor && umask 077 && cat > ~/.config/executor/pi.key'
 ```
 
-## Fabric
+## Reaching the tools
 
-pi-fabric's full-code mode hides Pi's native `codemode` and `tool_search`
-behind `fabric_exec`, and Fabric reaches only the servers mcporter knows
-(`~/.mcporter/mcporter.json`, `~/.codex/config.toml`), not `mcp.json`.
-`modify_fabric.json` adds each managed server to `mcp.nativeServers`, so it is
-callable as `mcp.executor.*` inside `fabric_exec` through Pi's own connection.
-Fabric keeps the rest of `fabric.json`.
+Servers use `codemode` exposure, Pi's default: the model calls their tools from
+`codemode` scripts (`mcp__executor`) or loads them with `tool_search`. After
+changing `mcp.json`, start a new session or run `/reload`.
 
-After changing either file, start a new session or run `/reload` and
-`/fabric reload`.
+pi-fabric was removed because its full-code mode hid Pi's native `codemode`
+and `tool_search` behind `fabric_exec` and reached MCP through mcporter
+instead of `mcp.json`, so servers configured here were invisible to the model.

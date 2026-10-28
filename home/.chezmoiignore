@@ -77,8 +77,9 @@ Library/Preferences
 .agents/.skill-lock.json
 .pi/agent/pstack/.agents
 .pi/agent/pstack/agents.lock
-.pi/agent/agents/poteto-agent.md
-.pi/agent/agents/comment-sicko.md
+.pi/agent/pstack/agents
+.claude/agents/poteto-agent.md
+.claude/agents/comment-sicko.md
 .pi/agent/auth.json
 .pi/agent/models.json
 {{/* MCP OAuth tokens written by `pi mcp login`. mcp.json itself is managed:

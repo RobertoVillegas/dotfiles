@@ -4,7 +4,7 @@ alwaysApply: true
 ---
 # pstack model configuration. One line per role. Delete a line to fall back to the skill default.
 # `inherit-parent` or `auto` as a value: the role runs on the parent chat model (omit Task `model`). Alias entries in a panel list still count toward its fan-out.
-# Managed by chezmoi for Pi, not written by /setup-pstack. Every role runs Claude Opus 5.5; ~/.pi/agent/pstack/PI.md says how a slug maps to a Pi subagent model and thinking level.
+# Managed by chezmoi for Pi, not written by /setup-pstack. Every role runs Claude Opus 5.5; ~/.pi/agent/pstack/HARNESSES.md says how a slug maps to a Pi subagent model and thinking level.
 # budget: large (xhigh)
 feature, refactoring: claude-opus-5-5-xhigh
 bug-fix: claude-opus-5-5-xhigh

@@ -47,29 +47,37 @@ replace the adaptation with upstream on the next install.
 ## pstack (Pi only)
 
 [pstack](https://github.com/cursor/plugins/tree/main/pstack) is installed apart
-from everything above, because only Pi should load it. It is a second dotagents
-project at `~/.pi/agent/pstack`:
+from everything above, because Codex and OpenCode should not load it. It is a
+second dotagents project at `~/.pi/agent/pstack`, read by Pi through its
+`skills` setting and by Claude Code only through `/poteto-mode`:
 
 ```text
 chezmoi apply
-  ├── ~/.pi/agent/pstack/{agents.toml,PI.md}        (chezmoi)
-  ├── ~/.pi/agent/prompts/poteto-mode.md            (chezmoi)  → /poteto-mode
-  ├── ~/.cursor/rules/pstack-models.mdc             (chezmoi)  model per role
+  ├── ~/.pi/agent/pstack/{agents.toml,HARNESSES.md}  (chezmoi)
+  ├── ~/.pi/agent/prompts/poteto-mode.md             (chezmoi)  → /poteto-mode in Pi
+  ├── ~/.claude/skills/poteto-mode/SKILL.md          (chezmoi)  → /poteto-mode in Claude Code
+  ├── ~/.cursor/rules/pstack-models.mdc              (chezmoi)  model per role
   └── run_after_33-install-pstack
         ├── dotagents --project install → ~/.pi/agent/pstack/.agents/skills
         ├── Pi settings.json `skills` += "pstack/.agents/skills"
-        └── ~/.pi/agent/agents/{poteto-agent,comment-sicko}.md, built from
-            pstack/agents/ at the commit dotagents resolved
+        └── poteto-agent and comment-sicko, built from pstack/agents/ at the
+            commit dotagents resolved:
+              ~/.pi/agent/pstack/agents/<name>.md   role a T3 child reads
+              ~/.claude/agents/<name>.md            Claude Code agent
 ```
 
-- `PI.md` maps pstack's Cursor tools (`Task`, `AskQuestion`, Custom Mode,
-  transcripts, `/deslop`) onto Pi and pi-subagents. Every pstack prompt reads it
-  first.
+- `HARNESSES.md` maps pstack's Cursor tools (`Task`, `AskQuestion`, Custom Mode,
+  transcripts, `/deslop`) onto each harness. The agent detects its harness from
+  its tools: Claude Code (the `Agent` tool), Pi inside T3 Code (the `t3-code`
+  MCP server, so `Task` becomes `delegate_task`), or Pi alone (no subagents;
+  the roles run in sequence). Every pstack prompt reads it first.
 - The models rule lives at Cursor's path because the skills read it from there.
   Every role runs Claude Opus 5.5.
 - `poteto-mode` declares `name: Poteto Mode`. dotagents' wildcard skips that
   name, so the manifest lists it explicitly, and Pi cannot reach it through
   `/skill:`, which is why the `/poteto-mode` prompt template exists.
+- Claude Code gets only the `/poteto-mode` skill, which reads pstack's files
+  from `~/.pi/agent/pstack` on demand, not every pstack skill in its list.
 
 ## aiforui.dev (paid, token-gated)
 

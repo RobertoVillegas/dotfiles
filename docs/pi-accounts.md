@@ -81,8 +81,8 @@ until …; this turn used Personal." With `"switchConversations": "auto"` in
 conversation moves that way.
 
 Background work follows its conversation's account and rule: compaction
-summaries, other background calls, and `pi-subagents` children. A child whose
-account runs out fails instead of spending another subscription.
+summaries and other background calls. A T3 child started with `delegate_task`
+is a conversation of its own and picks its account like any new one.
 
 | Mode | A new conversation gets |
 | --- | --- |

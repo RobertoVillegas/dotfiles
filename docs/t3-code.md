@@ -31,7 +31,7 @@ client sessions, provider tokens, projects, threads, branches, or worktrees.
 | Git | branches and history |
 | Worktrunk | worktrees |
 | Herdr | independent persistent terminal workflows |
-| Pi packages | Pi extensions, including `pi-subagents` and `pi-claude-bridge` |
+| Pi packages | Pi extensions, including `pi-claude-bridge` |
 
 ## Version and channel
 
@@ -267,21 +267,13 @@ databases) is never managed, and `chezmoi add` refuses it.
 - T3's permission modes act through Pi's tool hook. They are not a sandbox: a
   trusted extension's own code still runs with Pi's permissions.
 
-## Two ways to run subagents
+## Subagents
 
-```text
-Pi directly over SSH                 T3 as parent
-        |                                  |
-  Pi parent → pi-subagents           delegate_task → Claude / Codex / OpenCode / Pi
-  (children are Pi processes)        (children are T3 threads)
-```
-
-`pi-subagents` stays the tool for a Pi session opened directly in a terminal:
-its children are Pi processes with an explicit model and fallback chain.
-`delegate_task` is T3's: each child is a durable T3 thread on any provider and
-model, with its own history, and the result returns to the parent. Use T3 when
-the children should run on different harnesses, for example a Claude parent with
-Pi + GLM and Pi + DeepSeek children.
+T3's `delegate_task` is the only delegation for Pi: each child is a durable T3
+thread on any provider and model, with its own history, and the result returns
+to the parent. pi-subagents was removed; outside T3 the work happens in Claude
+Code, which has its own subagents. pstack maps its `Task` tool onto
+`delegate_task` in `~/.pi/agent/pstack/HARNESSES.md`.
 
 ### delegate_task
 

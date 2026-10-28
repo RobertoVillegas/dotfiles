@@ -71,6 +71,33 @@ chezmoi apply
   name, so the manifest lists it explicitly, and Pi cannot reach it through
   `/skill:`, which is why the `/poteto-mode` prompt template exists.
 
+## aiforui.dev (paid, token-gated)
+
+The `emil-*` skills from [aiforui.dev](https://aiforui.dev) are paid content
+fetched per account, so neither they nor the install token are versioned.
+`run_after_29-install-aiforui-skills` is their owner: it runs the pinned
+`@aiforui/install` against a throwaway `HOME` and copies the result into
+`~/.agents/skills`, where `run_after_32` links them for Claude like any other
+skill. It records the names it owns in `~/.local/state/dotfiles/aiforui-skills`,
+never overwrites a skill another owner has, and removes skills the account no
+longer receives.
+
+The token lives per machine, outside the repository:
+
+```sh
+install -d -m 700 ~/.config/aiforui
+pbpaste | tr -d '[:space:]' > ~/.config/aiforui/token   # from the install command
+chmod 600 ~/.config/aiforui/token
+DOTFILES_SKILLS_FORCE=1 chezmoi apply
+```
+
+`AIFORUI_TOKEN` takes precedence over the file. A host with neither skips the
+script, so devboxes stay untouched until they get their own token file.
+`~/.config/aiforui` is in `.chezmoiignore`, so `chezmoi add` refuses it.
+
+The installer only accepts the token as `--token=`, so it is visible in the
+process list for the few seconds the install takes.
+
 ## Versions follow upstream
 
 Third-party sources carry no `ref`. Each install takes the newest upstream

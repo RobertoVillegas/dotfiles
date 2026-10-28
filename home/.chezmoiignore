@@ -94,6 +94,9 @@ Library/Preferences
      makes an accidental `chezmoi add` refuse instead of committing a key.
      See docs/pi-models.md. */}}
 .config/pi/**
+{{/* aiforui.dev install token, read by run_after_29-install-aiforui-skills.
+     The skills it installs are paid content and stay unmanaged too. */}}
+.config/aiforui/**
 {{/* T3 keeps tokens, sessions and databases under ~/.t3; only its settings
      file is managed (modify_settings.json). */}}
 .t3/**

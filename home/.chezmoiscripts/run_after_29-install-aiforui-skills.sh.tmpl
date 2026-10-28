@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{- if eq .profile "dev" }}
+# aiforui.dev skills are paid content served per account, so neither the token
+# nor the skills belong in this public repository. The token lives in
+# ~/.config/aiforui/token (mode 600, listed in .chezmoiignore) or in
+# AIFORUI_TOKEN; a host without either skips this script. See docs/skills.md.
+#
+# The installer writes into every agent it detects, each in its own folder. It
+# runs instead against a throwaway HOME where only ~/.claude exists, and the
+# result is copied into ~/.agents/skills, so each skill exists once, like every
+# other one, and run_after_32 links it into ~/.claude/skills.
+
+export MISE_DATA_DIR="${MISE_DATA_DIR:-$HOME/.local/share/mise}"
+export PATH="$MISE_DATA_DIR/shims:$HOME/.local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:$PATH"
+
+# Pinned: this package receives the token. Same 4-hour cooldown as mise.
+installer="@aiforui/install@0.1.4"
+token_file="$HOME/.config/aiforui/token"
+skills_dir="$HOME/.agents/skills"
+state="$HOME/.local/state/dotfiles"
+owned="$state/aiforui-skills"
+stamp="$state/aiforui-skills-installed"
+
+token="${AIFORUI_TOKEN:-}"
+if [ -z "$token" ] && [ -r "$token_file" ]; then
+  token="$(tr -d '[:space:]' <"$token_file")"
+fi
+[ -n "$token" ] || exit 0
+
+# Skills are fetched from aiforui.dev on each install, so at most once every
+# 20 hours, which the daily autoupdate always finds. DOTFILES_SKILLS_FORCE=1
+# installs regardless, as for dotagents.
+want="$(printf '%s\n%s\n' "$installer" "$token" | shasum -a 256 | cut -d' ' -f1)"
+if [ -z "${DOTFILES_SKILLS_FORCE:-}" ] && [ -f "$stamp" ] &&
+  [ "$(cat "$stamp")" = "$want" ] && [ -z "$(find "$stamp" -mmin +1200)" ]; then
+  exit 0
+fi
+
+# Resolve node with the real HOME and put it ahead of the mise shims: under the
+# throwaway one, mise cannot find or trust its configuration.
+if ! node="$(mise which node 2>/dev/null)"; then
+  echo "node is unavailable; aiforui skills were left as they were." >&2
+  exit 0
+fi
+node_bin="${node%/*}"
+
+stage="$(mktemp -d)"
+trap 'rm -rf "$stage"' EXIT
+mkdir "$stage/.claude"
+
+# A failure (offline, expired token) keeps the installed skills and must not
+# abort the rest of the apply.
+# npm keeps the real cache and .npmrc, so its release-age settings still apply.
+if ! env HOME="$stage" \
+  PATH="$node_bin:$PATH" \
+  npm_config_cache="$HOME/.npm" \
+  npm_config_userconfig="$HOME/.npmrc" \
+  "$node_bin/npx" --yes "$installer" --token="$token" --global --yes </dev/null >"$stage/log" 2>&1; then
+  echo "aiforui install failed; its skills were left as they were:" >&2
+  sed 's/^/  /' "$stage/log" >&2
+  exit 0
+fi
+
+touch "$owned"
+mkdir -p "$skills_dir"
+: >"$stage/owned"
+for skill in "$stage/.claude/skills"/*/; do
+  skill="${skill%/}"
+  name="${skill##*/}"
+  [ -f "$skill/SKILL.md" ] || continue
+  # A name already owned by chezmoi or dotagents is never overwritten.
+  if [ -e "$skills_dir/$name" ] && ! grep -qxF "$name" "$owned"; then
+    echo "aiforui skill $name collides with an existing skill; skipped." >&2
+    continue
+  fi
+  rm -rf "${skills_dir:?}/$name"
+  cp -R "$skill" "$skills_dir/$name"
+  echo "$name" >>"$stage/owned"
+done
+
+# Remove skills this script installed before and the account no longer gets.
+# run_after_32 then drops their dangling Claude links.
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  grep -qxF "$name" "$stage/owned" || rm -rf "${skills_dir:?}/$name"
+done <"$owned"
+
+mv "$stage/owned" "$owned"
+printf '%s\n' "$want" >"$stamp"
+{{- end }}

@@ -23,6 +23,11 @@
 .agents/skills/grill-me
 
 {{/* Settings of Pi packages that were removed (pi-fabric,
-     pi-antigravity-bridge). */}}
+     pi-antigravity-bridge), and the pstack agents pi-subagents ran; they are
+     generated under ~/.pi/agent/pstack/agents now. */}}
 .pi/agent/fabric.json
 .pi/agent/antigravity-bridge
+.pi/agent/agents/poteto-agent.md
+.pi/agent/agents/comment-sicko.md
+{{/* Renamed to HARNESSES.md when pstack gained Claude Code and T3. */}}
+.pi/agent/pstack/PI.md

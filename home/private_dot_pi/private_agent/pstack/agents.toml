@@ -1,10 +1,12 @@
 # pstack (github.com/cursor/plugins/tree/main/pstack), for Pi only.
 #
 # A dotagents project of its own rather than an entry in ~/.agents/agents.toml:
-# that directory is read by Codex and OpenCode too, and pstack is meant for Pi.
+# that directory is read by Codex and OpenCode too, and pstack is meant for Pi
+# (and Claude Code, through its /poteto-mode skill, which reads it from here).
 # run_after_33-install-pstack installs it into ./.agents/skills, adds that
 # directory to Pi's `skills` setting, and builds the two pstack subagents from
-# the same commit. PI.md, next to this file, maps pstack's Cursor tools onto Pi.
+# the same commit. HARNESSES.md, next to this file, maps pstack's Cursor tools
+# onto Pi inside T3 Code, Pi alone, and Claude Code.
 #
 # Follows upstream with no `ref`, like the other third-party skills, behind the
 # same four-hour release-age window.

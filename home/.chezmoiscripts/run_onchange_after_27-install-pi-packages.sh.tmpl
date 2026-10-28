@@ -25,7 +25,6 @@ fi
 # unmanaged: they are machine data, not configuration.
 packages=(
   npm:pi-web-access@0.35.0
-  npm:pi-subagents@0.74.0
   npm:@narumitw/pi-goal@0.54.8
   npm:pi-memory@0.4.2
   npm:@trevonistrevon/pi-loop@0.7.15
@@ -57,7 +56,7 @@ obsolete_packages=(
   # Hid Pi's core tools and native codemode behind fabric_exec, and reached MCP
   # through its own mcporter layer instead of mcp.json, so servers configured
   # in Pi were invisible to the model. Pi 1.4 ships codemode, tool_search and
-  # parallel scripts natively; pi-subagents covers delegation.
+  # parallel scripts natively; T3's delegate_task covers delegation.
   npm:pi-fabric
   # Neither the antigravity provider nor its tools were used once in 60 days
   # on either host, and its web search duplicated pi-web-access.
@@ -65,6 +64,10 @@ obsolete_packages=(
   # No global tier was ever configured, and /fast does not reach pi-claude, the
   # default provider. Pi forwards serviceTier to OpenAI on its own.
   npm:pi-service-tier
+  # Delegation in T3 Code goes through T3's delegate_task, whose children are
+  # threads on any provider; pstack maps its Task tool onto it (HARNESSES.md).
+  # Outside T3 the user works in Claude Code, which has its own subagents.
+  npm:pi-subagents
 )
 
 settings="$HOME/.pi/agent/settings.json"

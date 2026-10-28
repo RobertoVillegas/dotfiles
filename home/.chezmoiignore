@@ -81,6 +81,10 @@ Library/Preferences
 .pi/agent/agents/comment-sicko.md
 .pi/agent/auth.json
 .pi/agent/models.json
+{{/* MCP OAuth tokens written by `pi mcp login`. mcp.json itself is managed:
+     it holds only server URLs, so every host gets the same servers and signs
+     in to each one locally. */}}
+.pi/agent/mcp-auth.json
 .pi/agent/models-store.json
 .pi/agent/sessions
 .claude/.credentials.json

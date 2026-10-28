@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "executor": {
+      "url": "https://executor.roberto.lol/mcp?search_tools=true"
+    }
+  }
+}

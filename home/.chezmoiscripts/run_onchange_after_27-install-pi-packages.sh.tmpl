@@ -30,8 +30,6 @@ packages=(
   npm:pi-memory@0.4.2
   npm:@trevonistrevon/pi-loop@0.7.15
   npm:@vanillagreen/pi-claude-bridge@4.0.8
-  npm:@estebanforge/pi-antigravity-bridge@1.7.8
-  npm:pi-service-tier@0.4.0
   # Several Claude subscriptions go through pi-claude-bridge and the
   # claude-accounts extension in ~/.pi/agent/extensions; see docs/pi-accounts.md.
 )
@@ -61,6 +59,12 @@ obsolete_packages=(
   # in Pi were invisible to the model. Pi 1.4 ships codemode, tool_search and
   # parallel scripts natively; pi-subagents covers delegation.
   npm:pi-fabric
+  # Neither the antigravity provider nor its tools were used once in 60 days
+  # on either host, and its web search duplicated pi-web-access.
+  npm:@estebanforge/pi-antigravity-bridge
+  # No global tier was ever configured, and /fast does not reach pi-claude, the
+  # default provider. Pi forwards serviceTier to OpenAI on its own.
+  npm:pi-service-tier
 )
 
 settings="$HOME/.pi/agent/settings.json"
@@ -143,22 +147,5 @@ if [ -f "$settings" ] && [ -z "$(jq -r '(.defaultProvider // "") + (.defaultMode
   jq '.defaultProvider = "pi-claude" | .defaultModel = "claude-opus-5-5"' "$settings" >"$settings_tmp"
   chmod 600 "$settings_tmp"
   mv "$settings_tmp" "$settings"
-fi
-
-# Conservative defaults for the Antigravity bridge. The config remains
-# machine-local and user-editable after creation; chezmoi never overwrites it.
-# bridgeTools "mcp" still matches only pi-mcp-adapter tools (bridge 1.7.8), so
-# with Pi's built-in MCP it bridges skills alone -- the narrow surface we want.
-antigravity_config="$HOME/.pi/agent/antigravity-bridge/config.json"
-if [ ! -e "$antigravity_config" ]; then
-  install -d -m 700 "$(dirname "$antigravity_config")"
-  umask 077
-  printf '%s\n' '{' \
-    '  "askTool": "on",' \
-    '  "bridgeTools": "mcp",' \
-    '  "digest": "off",' \
-    '  "systemPrompt": "on",' \
-    '  "approvals": { "gateMode": "shadow", "mode": "ask" }' \
-    '}' >"$antigravity_config"
 fi
 {{- end }}

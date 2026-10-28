@@ -22,5 +22,7 @@
 {{/* grill-me was a one-line alias for grilling (dotagents), which covers it. */}}
 .agents/skills/grill-me
 
-{{/* pi-fabric was removed from the Pi packages; its global settings went with it. */}}
+{{/* Settings of Pi packages that were removed (pi-fabric,
+     pi-antigravity-bridge). */}}
 .pi/agent/fabric.json
+.pi/agent/antigravity-bridge

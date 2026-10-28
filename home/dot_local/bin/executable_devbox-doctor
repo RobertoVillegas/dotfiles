@@ -92,9 +92,7 @@ for pi_package in \
   npm:@narumitw/pi-goal \
   npm:pi-memory \
   npm:@trevonistrevon/pi-loop \
-  npm:@vanillagreen/pi-claude-bridge \
-  npm:@estebanforge/pi-antigravity-bridge \
-  npm:pi-service-tier; do
+  npm:@vanillagreen/pi-claude-bridge; do
   if ! [ -f "$pi_settings" ] ||
     ! jq -e --arg package "$pi_package" \
       '.packages[]? | select(type == "string" and sub("@[^@/]*$"; "") == $package)' \

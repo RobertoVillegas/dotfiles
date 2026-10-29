@@ -76,6 +76,7 @@ brew "yq"
 {{- if and (eq .chezmoi.os "darwin") (eq .profile "dev") (eq .role "workstation") }}
 
 # macOS essentials.
+tap "lycorp-jp/tap"
 tap "productdevbook/tap"
 cask "1password"
 cask "1password-cli"
@@ -94,6 +95,8 @@ cask "datagrip"
 cask "figma"
 cask "paper-design"
 cask "productdevbook/tap/portkiller", trusted: true
+# Lets agents read and drive iOS simulators and Android devices.
+brew "lycorp-jp/tap/sim-use", trusted: true
 cask "postman"
 # Nightly, matching the npm:t3 pin: the app and server must speak the same
 # protocol. The app updates itself within the nightly channel;

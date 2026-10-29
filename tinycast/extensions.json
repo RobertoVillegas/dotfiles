@@ -32,6 +32,10 @@
     "title": "Remove Paywall"
   },
   {
+    "name": "simulator-manager",
+    "title": "Simulator Manager"
+  },
+  {
     "name": "speedtest",
     "title": "Speedtest"
   }

@@ -10,7 +10,7 @@ import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@e
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
-import { authStatus, logout, startLogin, type AuthStatus, type LoginSession } from "./claude-cli.ts";
+import { authStatus, keychainUnavailable, logout, startLogin, type AuthStatus, type LoginSession } from "./claude-cli.ts";
 import {
 	AccountRouter,
 	emptyState,
@@ -227,8 +227,12 @@ function contract(inst: Instance) {
 		recordUsage: (id: string, usage: unknown) => transact(inst, () => router.recordUsage(id, usage)),
 		recordRateLimit: (id: string, info: Record<string, unknown> | undefined, modelId: string) =>
 			transact(inst, () => router.recordRateLimit(id, info, modelId)),
-		recordFailure: (id: string, kind: Parameters<AccountRouter["recordFailure"]>[1], modelId: string) =>
-			transact(inst, () => router.recordFailure(id, kind, modelId)),
+		// Without the keychain every request fails as auth; that says nothing
+		// about the account, so it is not recorded as a failed login.
+		recordFailure: (id: string, kind: Parameters<AccountRouter["recordFailure"]>[1], modelId: string) => {
+			if (kind === "auth" && keychainUnavailable()) return;
+			transact(inst, () => router.recordFailure(id, kind, modelId));
+		},
 		recordSuccess: (id: string, sessionId?: string) => transact(inst, () => router.recordSuccess(id, sessionId)),
 		resolveProfile: (id: string) => router.resolveProfile(id),
 	};
@@ -333,9 +337,11 @@ async function checkLogins(inst: Instance): Promise<Map<string, AuthStatus | und
 	const accounts = [...inst.router.state.accounts];
 	const statuses = await Promise.all(accounts.map((p) => authStatus(p.configDir)));
 	const result = new Map<string, AuthStatus | undefined>();
+	const blind = keychainUnavailable();
 	transact(inst, () => {
 		accounts.forEach((p, i) => {
-			const status = statuses[i];
+			// Logged out is unknowable without the keychain; keep what is recorded.
+			const status = blind && !statuses[i]?.loggedIn ? undefined : statuses[i];
 			result.set(p.id, status);
 			if (!status || !inst.router.profile(p.id)) return;
 			inst.router.setLoggedIn(p.id, status.loggedIn);
@@ -351,6 +357,9 @@ function describe(router: AccountRouter, modelId: string, sessionId: string | un
 		`Claude accounts · mode ${router.config.mode} · conversations ${router.config.switchConversations === "auto" ? "switch automatically" : "ask before switching"}`,
 	];
 	if (router.state.accounts.length === 0) lines.push("  none yet: /claude-account add <name> [label]");
+	if (keychainUnavailable()) {
+		lines.push("  ⚠ This process cannot read the macOS keychain (an SSH session?), so logins are not checked here. Use Pi from the desktop session.");
+	}
 	for (const p of router.state.accounts) {
 		const id = router.state.identity[p.id];
 		const usage = router.state.usage[p.id];
@@ -420,7 +429,7 @@ async function finishSignIn(inst: Instance, ctx: ExtensionContext, id: string, o
 	const status = await authStatus(account.configDir);
 	const loggedIn = Boolean(ok && status?.loggedIn);
 	const duplicates = transact(inst, () => {
-		inst.router.setLoggedIn(id, loggedIn);
+		if (loggedIn || !keychainUnavailable()) inst.router.setLoggedIn(id, loggedIn);
 		if (loggedIn && status?.email) inst.router.recordIdentity(id, status);
 		return loggedIn ? inst.router.sameLogin(id) : [];
 	});

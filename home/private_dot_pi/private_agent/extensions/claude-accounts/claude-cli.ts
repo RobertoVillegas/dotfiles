@@ -3,7 +3,7 @@
 // sign-in and stores the session in the account's config directory (and the
 // macOS keychain); this only chooses the directory and relays what the CLI
 // prints.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -35,6 +35,32 @@ export function accountEnv(configDir: string | undefined): NodeJS.ProcessEnv {
 	if (configDir) env.CLAUDE_CONFIG_DIR = configDir;
 	else delete env.CLAUDE_CONFIG_DIR;
 	return env;
+}
+
+/** Whether a `security show-keychain-info` result means this process cannot
+ *  use the login keychain. Only macOS keeps Claude Code's tokens there. */
+export function keychainBlocked(platform: NodeJS.Platform, exitCode: number | null): boolean {
+	return platform === "darwin" && exitCode !== 0;
+}
+
+let keychainChecked: boolean | undefined;
+
+/**
+ * True when this process cannot read the macOS keychain, as in an SSH
+ * session ("User interaction is not allowed", exit 36). Claude Code then
+ * reports every account as logged out although its tokens are intact, and
+ * recording that in the shared state file logs the accounts out for every Pi
+ * on the machine, including T3's, which can read them. A process keeps the
+ * security session it was started in, so the answer is cached for its life.
+ */
+export function keychainUnavailable(): boolean {
+	if (keychainChecked === undefined) {
+		const exitCode = process.platform === "darwin"
+			? spawnSync("security", ["show-keychain-info"], { stdio: "ignore", timeout: 5_000 }).status
+			: 0;
+		keychainChecked = keychainBlocked(process.platform, exitCode);
+	}
+	return keychainChecked;
 }
 
 export interface AuthStatus {

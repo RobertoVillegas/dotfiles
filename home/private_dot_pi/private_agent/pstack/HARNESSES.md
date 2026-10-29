@@ -32,7 +32,7 @@ The child receives only the task text and its role, never your history, so every
 | model `claude-opus-5-5-<effort>`, `inherit-parent` or `auto` | `target: { providerInstanceId, model }` for Opus 5.5 from `orchestrator_capabilities` |
 | one worktree or directory per attempt | a Worktrunk worktree per attempt, its path in the task |
 
-Rules on the current T3 nightly:
+Rules in T3 0.1.x:
 
 - Always `mode: "async"`. A `mode: "wait"` call longer than about five minutes dies without returning the `taskId`.
 - Give every task its own `clientRequestId`, stable across retries, so a retry returns the same child instead of starting a second one.

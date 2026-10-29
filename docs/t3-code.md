@@ -36,8 +36,8 @@ client sessions, provider tokens, projects, threads, branches, or worktrees.
 ## Version and channel
 
 Orchestrator V2 (the Pi provider, `delegate_task`, and the orchestration MCP
-tools) ships only in the `0.0.46` nightlies; stable `0.0.45` does not have it.
-These dotfiles therefore track the nightly channel:
+tools) has been in the stable channel since `0.1.0`. These dotfiles adopted it
+while it was nightly-only and still track the nightly channel:
 
 | Piece | Where | Channel |
 | --- | --- | --- |
@@ -47,8 +47,9 @@ These dotfiles therefore track the nightly channel:
 A V1 app cannot talk to a V2 server, and the client refuses a server with a
 different orchestration protocol. When a client reports a mismatch, bump the
 `npm:t3` pin to the version it names and apply; `dotfiles-outdated` compares the
-pin against the `nightly` dist-tag. Move back to stable once a stable release
-contains V2.
+pin against the `nightly` dist-tag. Moving to stable means switching the cask to
+`t3-code` and the pin to the `latest` dist-tag together, since the app and the
+server must speak the same protocol.
 
 The first V2 start copies `state.sqlite` to `statev2.sqlite` and migrates the
 copy. Titles, messages, modes, and branches carry over; live provider sessions,
@@ -57,12 +58,12 @@ old checkpoints, diffs, and tool activity do not. See upstream issue
 
 ### Provider versions
 
-T3 publishes a compatibility table per release. For `0.0.46`:
+T3 publishes minimum provider versions per release. For `0.1.x`:
 
 | Provider | Supported | Pinned here |
 | --- | --- | --- |
 | Claude Code | `>= 2.1.280` | floor in `run_onchange_after_20-install-runtime-tools` |
-| Codex | `>= 0.156` (recommended `>= 0.159`) | mise |
+| Codex | `>= 0.159` | mise |
 | OpenCode 2 | `>= 2.0.18` | floor in `run_onchange_after_20-install-runtime-tools` |
 | Pi | `>= 0.80.5` (recommended `>= 1.0`) | mise |
 
@@ -146,10 +147,10 @@ warning:
 npx t3@CLIENT_VERSION service update
 ```
 
-`@latest` installs the stable channel, which has no Orchestrator V2; use the
-nightly version from the mise pin or from the client's mismatch notice. In any
-case use the exact version for a client/server mismatch: the server and client
-must speak the same orchestration protocol.
+`@latest` installs the stable channel, which can differ from the nightly app;
+use the nightly version from the mise pin or from the client's mismatch notice.
+In any case use the exact version for a client/server mismatch: the server and
+client must speak the same orchestration protocol.
 Removal is explicit and destructive to availability, so it is never automated:
 
 ```sh
@@ -286,7 +287,7 @@ The child receives only the task text and an optional role, never the parent's
 history, so the task must be self-contained. Runtime and interaction modes can
 stay equal or narrow; a child cannot escalate past its parent.
 
-Rules for reliable delegation on the current nightly:
+Rules for reliable delegation in T3 `0.1.x`:
 
 1. **Prefer `mode: "async"`** and follow up with `task_status`. A
    `mode: "wait"` call longer than about five minutes dies in Node-based MCP

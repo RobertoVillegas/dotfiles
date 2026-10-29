@@ -42,8 +42,8 @@ worktrunk = "0.81.0"
 # Cloudflare's CLI for the whole API (DNS, zones); Wrangler has no DNS commands.
 # Still in beta, so keep an exact pin and read the changelog before bumping.
 "npm:cf" = "1.0.0-beta.25"
-# Nightly on purpose: Orchestrator V2 (Pi provider, delegate_task) is not in a
-# stable release yet. Keep it equal to the T3 Code nightly desktop app.
+# Nightly because the desktop app is the nightly cask, and the server and app
+# must speak the same protocol. Keep it equal to the app's version.
 "npm:t3" = { version = "0.1.4-nightly.20261028.3838", npm_args = "--legacy-peer-deps" }
 {{- end }}
 

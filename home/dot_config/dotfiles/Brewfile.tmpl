@@ -95,8 +95,8 @@ cask "figma"
 cask "paper-design"
 cask "productdevbook/tap/portkiller", trusted: true
 cask "postman"
-# Nightly: Orchestrator V2 is not in a stable release yet, and a V1 app cannot
-# connect to a V2 server. The app updates itself within the nightly channel;
+# Nightly, matching the npm:t3 pin: the app and server must speak the same
+# protocol. The app updates itself within the nightly channel;
 # bump the npm:t3 pin in mise when a client reports a version mismatch.
 cask "t3-code@nightly"
 cask "yaak"

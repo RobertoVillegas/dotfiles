@@ -2,7 +2,7 @@
 set -euo pipefail
 
 {{ if eq .profile "dev" -}}
-version="0.3.4"
+version="0.4.3"
 target=""
 sha256=""
 
@@ -11,15 +11,15 @@ sha256=""
 case "{{ .chezmoi.os }}-{{ .chezmoi.arch }}" in
   darwin-arm64)
     target="darwin-arm64"
-    sha256="3623dd8909d7cdde3e8813059bbec51ee4bd43ede5daaec2b109634c12c050a2"
+    sha256="ea292e7881ef076ccda3c900c7e9ddec90e8a800d1b574b9302c0f10c372a827"
     ;;
   linux-arm64)
     target="linux-arm64"
-    sha256="d322df19ac55a8c437af673636b6b17e5a8f865734a83167d6514d034fc47476"
+    sha256="708edd5fe76ab2915418e88bc1efe56549dc3446a18645d194d673ae8d60801c"
     ;;
   linux-amd64)
     target="linux-x64"
-    sha256="1df6b77eeee902ee407471957035e47fd29920981798fa4f6aa1f31b89477719"
+    sha256="2e0b12321cb83c3b42b84516f29ba79618915314c459ac16275cc33e9c340051"
     ;;
   *)
     echo "terminal-code ${version} does not support {{ .chezmoi.os }}/{{ .chezmoi.arch }}; skipping" >&2

@@ -178,7 +178,7 @@ fi
 
 if command -v druk >/dev/null 2>&1; then
 	report "druk" "$(druk --version 2>/dev/null | head -1)" \
-		"$(github_latest_release letstri/druk)" "$scripts/…28-install-druk" \
+		"$(github_latest_release letstri/druk)" "Brewfile (brew upgrade druk)" \
 		"$(github_release_date letstri/druk)"
 fi
 

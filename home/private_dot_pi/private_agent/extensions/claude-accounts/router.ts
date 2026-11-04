@@ -496,10 +496,14 @@ export class AccountRouter {
 
 	setLoggedIn(id: string, loggedIn: boolean): void {
 		const account = this.profile(id);
-		if (!account || account.loggedIn === loggedIn || (loggedIn && account.loggedIn === undefined)) return;
-		account.loggedIn = loggedIn;
-		if (loggedIn) delete this.state.needsLogin[id];
-		this.persist(this.state);
+		if (!account) return;
+		// A login that succeeds clears a failed one even when the account was
+		// already marked logged in: that is the usual case after a token expires.
+		const clearsFailure = loggedIn && this.state.needsLogin[id] !== undefined;
+		if (clearsFailure) delete this.state.needsLogin[id];
+		const changes = account.loggedIn !== loggedIn && !(loggedIn && account.loggedIn === undefined);
+		if (changes) account.loggedIn = loggedIn;
+		if (changes || clearsFailure) this.persist(this.state);
 	}
 
 	/** Clear cooldowns and login flags, e.g. after logging in again. */

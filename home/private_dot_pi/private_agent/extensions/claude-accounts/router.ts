@@ -502,6 +502,16 @@ export class AccountRouter {
 		this.persist(this.state);
 	}
 
+	/** Records a sign-in the user just finished. Unlike a status check, it also
+	 *  clears a failed login: after a token expires the account is still marked
+	 *  logged in, and `claude auth status` keeps saying so. */
+	signedIn(id: string): void {
+		this.setLoggedIn(id, true);
+		if (this.state.needsLogin[id] === undefined) return;
+		delete this.state.needsLogin[id];
+		this.persist(this.state);
+	}
+
 	/** Clear cooldowns and login flags, e.g. after logging in again. */
 	reset(): void {
 		this.state.cooldowns = {};

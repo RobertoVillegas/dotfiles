@@ -163,8 +163,16 @@ test("logging in again clears a failed login on an account already marked logged
 	router.setLoggedIn("work", true);
 	router.recordFailure("work", "auth", OPUS);
 	assert.equal(router.available("work", OPUS), false);
-	router.setLoggedIn("work", true);
+	router.signedIn("work");
 	assert.equal(router.available("work", OPUS), true);
+});
+
+test("a status check that still reports logged in keeps a failed login", () => {
+	const { router } = setup();
+	router.setLoggedIn("work", true);
+	router.recordFailure("work", "auth", OPUS);
+	router.setLoggedIn("work", true);
+	assert.equal(router.available("work", OPUS), false);
 });
 
 // The default: a conversation with history never leaves its account alone.

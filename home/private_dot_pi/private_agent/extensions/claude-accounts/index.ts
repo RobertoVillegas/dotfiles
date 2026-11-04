@@ -429,7 +429,8 @@ async function finishSignIn(inst: Instance, ctx: ExtensionContext, id: string, o
 	const status = await authStatus(account.configDir);
 	const loggedIn = Boolean(ok && status?.loggedIn);
 	const duplicates = transact(inst, () => {
-		if (loggedIn || !keychainUnavailable()) inst.router.setLoggedIn(id, loggedIn);
+		if (loggedIn) inst.router.signedIn(id);
+		else if (!keychainUnavailable()) inst.router.setLoggedIn(id, false);
 		if (loggedIn && status?.email) inst.router.recordIdentity(id, status);
 		return loggedIn ? inst.router.sameLogin(id) : [];
 	});

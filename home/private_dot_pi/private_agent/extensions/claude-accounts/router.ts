@@ -496,14 +496,20 @@ export class AccountRouter {
 
 	setLoggedIn(id: string, loggedIn: boolean): void {
 		const account = this.profile(id);
-		if (!account) return;
-		// A login that succeeds clears a failed one even when the account was
-		// already marked logged in: that is the usual case after a token expires.
-		const clearsFailure = loggedIn && this.state.needsLogin[id] !== undefined;
-		if (clearsFailure) delete this.state.needsLogin[id];
-		const changes = account.loggedIn !== loggedIn && !(loggedIn && account.loggedIn === undefined);
-		if (changes) account.loggedIn = loggedIn;
-		if (changes || clearsFailure) this.persist(this.state);
+		if (!account || account.loggedIn === loggedIn || (loggedIn && account.loggedIn === undefined)) return;
+		account.loggedIn = loggedIn;
+		if (loggedIn) delete this.state.needsLogin[id];
+		this.persist(this.state);
+	}
+
+	/** Records a sign-in the user just finished. Unlike a status check, it also
+	 *  clears a failed login: after a token expires the account is still marked
+	 *  logged in, and `claude auth status` keeps saying so. */
+	signedIn(id: string): void {
+		this.setLoggedIn(id, true);
+		if (this.state.needsLogin[id] === undefined) return;
+		delete this.state.needsLogin[id];
+		this.persist(this.state);
 	}
 
 	/** Clear cooldowns and login flags, e.g. after logging in again. */

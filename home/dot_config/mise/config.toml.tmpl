@@ -1,7 +1,7 @@
 [tools]
 # JavaScript runtimes and package managers.
-node = "24.22.2"
-pnpm = "12.16.1"
+node = "26.13.1"
+pnpm = "12.18.0"
 bun = "1.4.4"
 
 {{- if eq .profile "dev" }}
@@ -10,9 +10,9 @@ bun = "1.4.4"
 # first, at different versions. One owner each: mise takes anything tied to a
 # language ecosystem, brew keeps the native system tools.
 just = "1.59.0"
-uv = "0.13.6"
-ruff = "0.17.3"
-python = "3.14.10"
+uv = "0.13.7"
+ruff = "0.17.4"
+python = "3.15.2"
 {{- end }}
 
 {{- if and (eq .profile "dev") (ne .gpu "none") }}
@@ -30,21 +30,26 @@ flatc = "25.12.19"
 # Codex and Pi are the exception and update themselves: see config.local.toml.
 herdr = "0.9.5"
 worktrunk = "0.81.0"
-"npm:@fission-ai/openspec" = "1.15.0"
+"npm:@fission-ai/openspec" = "1.17.0"
 # Shared QMD executable; Pi and Hermes keep separate named collections.
 # Third-party Agent Skills; the manifest is ~/.agents/agents.toml.
 "npm:@sentry/dotagents" = "3.4.0"
 "npm:@tobilu/qmd" = { version = "2.8.3", allow_builds = ["node-llama-cpp"] }
 "npm:@vercel/before-and-after" = "0.0.4"
-"npm:agent-browser" = { version = "0.41.0", allow_builds = ["agent-browser"] }
-"npm:dev3000" = "0.0.187"
-"npm:portless" = "0.15.12"
+"npm:agent-browser" = { version = "0.42.0", allow_builds = ["agent-browser"] }
+{{- if eq .role "workstation" }}
+# Desktop apps run only on the workstation; devboxes are headless. The build
+# script links the native binary in place of a Node launcher.
+"npm:agent-desktop" = { version = "1.2.0", allow_builds = ["agent-desktop"] }
+{{- end }}
+"npm:dev3000" = "0.0.192"
+"npm:portless" = "0.17.0"
 # Cloudflare's CLI for the whole API (DNS, zones); Wrangler has no DNS commands.
 # Still in beta, so keep an exact pin and read the changelog before bumping.
 "npm:cf" = "1.0.0-beta.25"
 # Nightly because the desktop app is the nightly cask, and the server and app
 # must speak the same protocol. Keep it equal to the app's version.
-"npm:t3" = { version = "0.1.4-nightly.20261028.3838", npm_args = "--legacy-peer-deps" }
+"npm:t3" = { version = "0.1.9-nightly.20261110.4478", npm_args = "--legacy-peer-deps" }
 {{- end }}
 
 [settings]

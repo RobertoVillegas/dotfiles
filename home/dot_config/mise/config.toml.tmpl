@@ -37,6 +37,11 @@ worktrunk = "0.81.0"
 "npm:@tobilu/qmd" = { version = "2.8.3", allow_builds = ["node-llama-cpp"] }
 "npm:@vercel/before-and-after" = "0.0.4"
 "npm:agent-browser" = { version = "0.41.0", allow_builds = ["agent-browser"] }
+{{- if eq .role "workstation" }}
+# Desktop apps run only on the workstation; devboxes are headless. The build
+# script links the native binary in place of a Node launcher.
+"npm:agent-desktop" = { version = "1.2.0", allow_builds = ["agent-desktop"] }
+{{- end }}
 "npm:dev3000" = "0.0.187"
 "npm:portless" = "0.15.12"
 # Cloudflare's CLI for the whole API (DNS, zones); Wrangler has no DNS commands.

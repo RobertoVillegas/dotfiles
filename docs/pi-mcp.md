@@ -13,7 +13,9 @@ dotfiles, one file per machine, like the provider keys in
 
 ## Executor
 
-[Executor](https://executor.roberto.lol) authenticates with an API key sent as
+[Executor](https://contabo.husky-kanyu.ts.net:4443) runs on the Contabo VPS behind
+Tailscale Serve, so only hosts on the tailnet reach it. It authenticates with an
+API key sent as
 `Authorization: Bearer`. The header in `mcp.json` is a command that reads
 `EXECUTOR_PI_API_KEY` first, then the key file, like the `apiKey` lines in
 `models.json`. A server with an `Authorization` header never uses OAuth, so

@@ -8,11 +8,14 @@
 # of those machines would run it.
 set -euo pipefail
 
+# Render against this checkout, not the source chezmoi applies from: a
+# worktree on a branch differs from it.
 cd "$(git rev-parse --show-toplevel)"
 
 profiles=(
   '{"chezmoi":{"os":"darwin"},"profile":"dev","role":"workstation","editor":"both","personal":true}'
   '{"chezmoi":{"os":"darwin"},"profile":"dev","role":"devbox","container":"orbstack"}'
+  '{"chezmoi":{"os":"darwin"},"profile":"dev","role":"devbox","container":"orbstack","llmHub":true}'
   '{"chezmoi":{"os":"linux"},"profile":"dev","role":"devbox","gpu":"nvidia","container":"docker-engine"}'
   '{"chezmoi":{"os":"linux"},"profile":"dev","role":"devbox","target":"wsl","gpu":"nvidia"}'
   '{"chezmoi":{"os":"linux"},"profile":"base","role":"workstation"}'
@@ -44,7 +47,7 @@ for file in "${files[@]}"; do
   for data in "${profiles[@]}"; do
     rendered="$work/rendered"
     if [ -n "$is_template" ]; then
-      if ! chezmoi execute-template --override-data "$data" <"$file" >"$rendered" 2>"$work/err"; then
+      if ! chezmoi --source "$PWD" execute-template --override-data "$data" <"$file" >"$rendered" 2>"$work/err"; then
         printf '%s: template fails for %s\n' "$file" "$data" >&2
         sed 's/^/  /' "$work/err" >&2
         failures=$((failures + 1))

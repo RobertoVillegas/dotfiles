@@ -126,6 +126,12 @@ cask "t3-code@nightly"
 {{- if or (eq .container "auto") (eq .container "orbstack") }}
 cask "orbstack"
 {{- end }}
+{{- if dig "llmHub" false . }}
+
+# Subscription hub for the tailnet (docs/llm-hub.md). local.cliproxyapi runs
+# it; `brew services` stays off so the two never fight over port 8317.
+brew "cliproxyapi"
+{{- end }}
 {{- end }}
 
 {{- if and (eq .chezmoi.os "linux") (eq .profile "dev") (eq .role "devbox") (eq .container "docker-engine") }}

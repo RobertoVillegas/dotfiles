@@ -182,6 +182,11 @@ Los providers de Pi que no vienen en el catálogo, y las API keys que usan, se
 configuran por máquina siguiendo la [guía de modelos de Pi](docs/pi-models.md):
 `models.json` y los archivos de `~/.config/pi` no se versionan.
 
+Una devbox Mac que siempre está en casa puede ser el hub de suscripciones de la
+tailnet con `--llm-hub`: CLIProxyAPI concentra las cuentas de Claude y Codex y
+las demás máquinas apuntan a ella. Las reglas y el riesgo están en la
+[guía del hub](docs/llm-hub.md).
+
 ### Flujo remoto
 
 Trabajas en el devbox desde la workstation o el móvil sobre Tailscale: las

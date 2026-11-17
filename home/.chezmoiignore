@@ -105,6 +105,15 @@ Library/Preferences
      makes an accidental `chezmoi add` refuse instead of committing a key.
      See docs/pi-models.md. */}}
 .config/pi/**
+{{/* CLIProxyAPI hub (docs/llm-hub.md): its config holds the access and
+     management keys and is rewritten by the management panel, and
+     ~/.cli-proxy-api holds the OAuth tokens of every signed-in account.
+     run_onchange_after_38-configure-llm-hub seeds the config once. */}}
+.config/cliproxyapi/**
+.cli-proxy-api/**
+{{ if not (dig "llmHub" false .) }}
+Library/LaunchAgents/local.cliproxyapi.plist
+{{ end }}
 {{/* aiforui.dev install token, read by run_after_29-install-aiforui-skills.
      The skills it installs are paid content and stay unmanaged too. */}}
 .config/aiforui/**

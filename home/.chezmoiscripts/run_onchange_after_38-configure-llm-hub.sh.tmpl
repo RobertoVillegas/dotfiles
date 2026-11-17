@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Re-run whenever the unit changes.
+# launchd: {{ includeTemplate "private_Library/LaunchAgents/local.cliproxyapi.plist.tmpl" . | sha256sum }}
+
+{{ if and (eq .chezmoi.os "darwin") (eq .profile "dev") (eq .role "devbox") (dig "llmHub" false .) -}}
+# CLIProxyAPI hub for the tailnet. docs/llm-hub.md explains the setup and the
+# rules that keep the accounts safe. This script only seeds the config: after
+# that the management panel owns it, so chezmoi never rewrites it.
+export PATH="/opt/homebrew/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+label="local.cliproxyapi"
+uid="$(id -u)"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+binary="/opt/homebrew/opt/cliproxyapi/bin/cliproxyapi"
+config_dir="$HOME/.config/cliproxyapi"
+config="$config_dir/config.yaml"
+keys="$config_dir/keys.env"
+state_dir="$HOME/.local/state/cliproxyapi"
+port=8317
+
+stop_hub() {
+  for domain in "user/$uid" "gui/$uid"; do
+    launchctl bootout "$domain/$label" 2>/dev/null || true
+  done
+}
+
+if [ ! -x "$binary" ]; then
+  echo "warn: cliproxyapi is not installed; apply again after the Brewfile runs" >&2
+  exit 0
+fi
+
+# Every request leaves through this machine's connection. An exit node (a
+# Mullvad location, say) would show Anthropic a VPN address that changes, which
+# is what gets subscriptions flagged. Refuse to serve until it is off.
+if command -v tailscale >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  exit_node="$(tailscale status --json 2>/dev/null | jq -r '.ExitNodeStatus.ID // empty' || true)"
+  if [ -n "$exit_node" ]; then
+    stop_hub
+    echo "error: this hub routes through a Tailscale exit node; CLIProxyAPI stays stopped." >&2
+    echo "       Run 'tailscale set --exit-node=' and apply again. See docs/llm-hub.md." >&2
+    exit 1
+  fi
+fi
+
+mkdir -p "$state_dir"
+mkdir -p "$config_dir"
+chmod 700 "$config_dir"
+
+if [ ! -e "$config" ]; then
+  (
+    umask 077
+    access_key="$(openssl rand -hex 32)"
+    management_key="$(openssl rand -hex 32)"
+    # CLIProxyAPI replaces the management key in config.yaml with its bcrypt
+    # hash on first start, so the plaintext is kept here for the panel.
+    cat >"$keys" <<EOF
+# CLIProxyAPI hub keys. Never commit or paste these.
+# Clients send the access key as their bearer token; the management key opens
+# /management.html.
+CLIPROXYAPI_ACCESS_KEY=$access_key
+CLIPROXYAPI_MANAGEMENT_KEY=$management_key
+EOF
+    cat >"$config" <<EOF
+# Seeded by dotfiles (run_onchange_after_38-configure-llm-hub). The management
+# panel edits this file from now on; chezmoi does not touch it again.
+config-version: 8
+server:
+  # Loopback only. Tailscale Serve is the front door on :$port.
+  host: "127.0.0.1"
+  port: $port
+  trusted-proxies: ["127.0.0.1", "::1"]
+management:
+  # Remote means the tailnet: nothing else reaches this port.
+  allow-remote: true
+  secret-key: "$management_key"
+access:
+  api-keys:
+    - "$access_key"
+routing:
+  # Use one account until it runs out instead of spreading every request:
+  # closer to one person's usage, and the prompt cache stays warm.
+  strategy: "fill-first"
+  session-affinity: true
+  session-affinity-ttl: "1h"
+  session-affinity-subagents: true
+  # Move a conversation to another account only for quota or auth, not for a
+  # transient upstream error.
+  session-affinity-rebind-on: "quota"
+  retry:
+    request-retry: 3
+    max-retry-interval: 30
+upstream:
+  claude:
+    # auto: real Claude Code clients pass through untouched. Only Claude Code
+    # may use the Claude accounts; see docs/llm-hub.md.
+    disable-claude-cloak-mode: false
+oauth:
+  auth-dir: "~/.cli-proxy-api"
+observability:
+  logs:
+    logging-to-file: true
+    logs-max-total-size-mb: 200
+  usage:
+    # Feeds the usage queue that analytics panels read.
+    usage-statistics-enabled: true
+EOF
+  )
+  echo "Seeded $config; keys are in $keys"
+fi
+
+# brew's own service would race local.cliproxyapi for the port.
+if brew services list 2>/dev/null | awk '$1 == "cliproxyapi" && $2 != "none" { found = 1 } END { exit !found }'; then
+  brew services stop cliproxyapi || true
+fi
+
+stop_hub
+# Same domain preference as the Portless proxy: gui/ first, user/ when the
+# agent is loaded over SSH with no live GUI session.
+if launchctl bootstrap "gui/$uid" "$plist" 2>/dev/null; then
+  echo "$label bootstrapped into gui/$uid"
+elif launchctl bootstrap "user/$uid" "$plist" 2>/dev/null; then
+  echo "$label bootstrapped into user/$uid"
+else
+  echo "warn: could not load $label; run 'launchctl bootstrap gui/$uid $plist'" >&2
+fi
+# dotfiles-autoupdate restarts the hub when brew upgrades it past this version.
+brew list --versions cliproxyapi >"$state_dir/version" 2>/dev/null || true
+
+if command -v tailscale >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  if tailscale serve status --json 2>/dev/null | jq -e --arg p ":$port" '.Web // {} | keys | any(endswith($p))' >/dev/null; then
+    echo "Tailscale Serve already publishes :$port"
+  elif tailscale serve --bg --https="$port" "http://127.0.0.1:$port" >/dev/null; then
+    echo "Tailscale Serve publishes the hub on :$port"
+  else
+    echo "warn: could not publish :$port; run 'tailscale serve --bg --https=$port http://127.0.0.1:$port'" >&2
+  fi
+else
+  echo "warn: tailscale or jq is missing; the hub is only reachable on this machine" >&2
+fi
+
+if [ -z "$(find "$HOME/.cli-proxy-api" -name 'claude-*.json' 2>/dev/null | head -n 1)" ]; then
+  echo "No Claude account is signed in yet. Next step: docs/llm-hub.md, 'Sign in the accounts'."
+fi
+{{ else -}}
+:
+{{ end -}}

@@ -44,3 +44,11 @@
 	process = git-lfs filter-process
 	required = true
 {{ end -}}
+# Work identity for aptomx repositories. ~/.gitconfig-apto stays on each
+# machine, outside this public repo; git skips a missing include.
+[includeIf "hasconfig:remote.*.url:https://github.com/aptomx/**"]
+	path = ~/.gitconfig-apto
+[includeIf "hasconfig:remote.*.url:git@github.com:aptomx/**"]
+	path = ~/.gitconfig-apto
+[includeIf "hasconfig:remote.*.url:ssh://git@github.com/aptomx/**"]
+	path = ~/.gitconfig-apto

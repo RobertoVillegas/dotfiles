@@ -43,6 +43,7 @@
 ## Trust boundary
 
 - A worktree separates files; it is not a sandbox. Use a container, VM, or separate OS user for untrusted repositories or unmonitored execution.
+- Use the `microsandbox` skill (`msb`) to run untrusted code, scripts, or dependency installs in a disposable microVM. Mount host paths read-only and never mount credential directories into it.
 - Review a project's agent resources before granting it Pi project trust.
 
 ## Browser automation

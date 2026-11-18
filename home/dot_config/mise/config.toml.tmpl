@@ -30,6 +30,10 @@ flatc = "25.12.19"
 # Codex and Pi are the exception and update themselves: see config.local.toml.
 herdr = "0.9.5"
 worktrunk = "0.82.0"
+# `msb` runs untrusted code in a disposable Linux microVM with its own kernel.
+# It needs Apple Silicon or Linux with /dev/kvm. The agent skill that teaches
+# its use is declared in ~/.agents/agents.toml.
+microsandbox = "0.7.16"
 "npm:@fission-ai/openspec" = "2.1.0"
 # Shared QMD executable; Pi and Hermes keep separate named collections.
 # Third-party Agent Skills; the manifest is ~/.agents/agents.toml.

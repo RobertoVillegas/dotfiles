@@ -33,6 +33,7 @@ minimum_release_age = 240
 github_repos = [
   "mattpocock/skills",
   "nutlope/hallmark",
+  "superradcompany/skills",
   "upstash/context7",
   "vercel-labs/skills",
 {{- if eq .role "devbox" }}
@@ -72,6 +73,12 @@ source = "upstash/context7"
 [[skills]]
 name = "find-skills"
 source = "vercel-labs/skills"
+
+# Instructions only: no scripts or hooks. It tells agents not to install or
+# update msb themselves; mise owns the runtime.
+[[skills]]
+name = "microsandbox"
+source = "superradcompany/skills"
 {{- if eq .role "devbox" }}
 
 # The devbox runs the browser; the workstation has its own browser tooling.

@@ -66,6 +66,22 @@ checksum = "sha256:6574cea774ed4cae12e24b6aa11857de33e80dab4667cf628fd5840df96a2
 url = "https://github.com/casey/just/releases/download/1.59.0/just-1.59.0-aarch64-apple-darwin.tar.gz"
 url_api = "https://api.github.com/repos/casey/just/releases/assets/643129724"
 
+[[tools.microsandbox]]
+version = "0.7.16"
+backend = "aqua:superradcompany/microsandbox"
+
+[tools.microsandbox."platforms.linux-x64"]
+checksum = "sha256:1f09ec7057bfcccb70e1713eb61061f15fa759b45e147759eb0b30aa7f5cb3bd"
+checksum_source = "mise-versions"
+url = "https://github.com/superradcompany/microsandbox/releases/download/v0.7.16/microsandbox-linux-x86_64.tar.gz"
+url_api = "https://api.github.com/repos/superradcompany/microsandbox/releases/assets/762305291"
+
+[tools.microsandbox."platforms.macos-arm64"]
+checksum = "sha256:b9341df7cc9a197fb1788c5b3dd7b32cf7036615f7f1a0f7d31685fd9e385ad1"
+checksum_source = "mise-versions"
+url = "https://github.com/superradcompany/microsandbox/releases/download/v0.7.16/microsandbox-darwin-aarch64.tar.gz"
+url_api = "https://api.github.com/repos/superradcompany/microsandbox/releases/assets/762305280"
+
 [[tools.node]]
 version = "26.13.1"
 backend = "core:node"

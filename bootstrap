@@ -9,6 +9,7 @@ container="auto"
 target="auto"
 gpu="auto"
 remote_owner="auto"
+llm_hub="${DOTFILES_LLM_HUB:-}"
 repo="RobertoVillegas/dotfiles"
 prompt_input="${DOTFILES_PROMPT_INPUT:-/dev/tty}"
 
@@ -28,6 +29,8 @@ Run without options to open the interactive setup menu.
   --gpu=auto|nvidia|none
   --container=auto|orbstack|docker-desktop|docker-engine|none
   --remote-owner=auto|windows|linux
+  --llm-hub              Run the CLIProxyAPI hub on this macOS devbox
+                         (docs/llm-hub.md)
   --repo=OWNER/REPO      Override the chezmoi repository
   -h, --help             Show this help
 EOF
@@ -196,6 +199,7 @@ while (($#)); do
     --gpu=*) gpu="${1#*=}" ;;
     --container=*) container="${1#*=}" ;;
     --remote-owner=*) remote_owner="${1#*=}" ;;
+    --llm-hub) llm_hub="true" ;;
     --repo=*) repo="${1#*=}" ;;
     -h | --help)
       usage
@@ -263,6 +267,10 @@ if [[ "$target" == "macos" && "$gpu" == "nvidia" ]]; then
   echo "Invalid combination: target=macos does not support gpu=nvidia" >&2
   exit 2
 fi
+if [[ "$llm_hub" == "true" && ( "$role" != "devbox" || "$target" != "macos" ) ]]; then
+  echo "Invalid combination: --llm-hub needs a macOS devbox (--devbox on a Mac)" >&2
+  exit 2
+fi
 if [[ "$target" == "wsl" && "$container" == "docker-engine" ]]; then echo "Warning: Docker Engine inside WSL is an advanced, non-default route." >&2; fi
 
 if [[ "$role" == "devbox" ]]; then
@@ -279,6 +287,8 @@ export DOTFILES_TARGET="$target"
 export DOTFILES_GPU="$gpu"
 export DOTFILES_CONTAINER="$container"
 export DOTFILES_REMOTE_OWNER="$remote_owner"
+# Unset keeps whatever this machine already has; see home/.chezmoi.toml.tmpl.
+if [[ -n "$llm_hub" ]]; then export DOTFILES_LLM_HUB="$llm_hub"; fi
 
 if ! command -v chezmoi >/dev/null 2>&1; then
   bin_dir="$HOME/.local/bin"

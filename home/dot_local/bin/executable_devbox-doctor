@@ -204,6 +204,38 @@ else
   warn "Tailscale is not connected or its CLI needs setup"
 fi
 
+# CLIProxyAPI hub (docs/llm-hub.md), only where the dotfiles seeded one.
+if [ -f "$HOME/.config/cliproxyapi/config.yaml" ]; then
+  if lsof -nP -iTCP:8317 -sTCP:LISTEN >/dev/null 2>&1; then
+    pass "CLIProxyAPI hub listens on 127.0.0.1:8317"
+  else
+    fail "CLIProxyAPI hub is not listening on 8317 (log: ~/.local/state/cliproxyapi/cliproxyapi.log)"
+  fi
+  hub_exit_node="$(tailscale status --json 2>/dev/null | jq -r '.ExitNodeStatus.ID // empty' 2>/dev/null || true)"
+  if [ -n "$hub_exit_node" ]; then
+    fail "The hub routes through a Tailscale exit node: run 'tailscale set --exit-node='"
+  else
+    pass "The hub uses no exit node"
+  fi
+  hub_org="$(curl -fsS --max-time 8 https://ipinfo.io/org 2>/dev/null || true)"
+  case "$hub_org" in
+    "") warn "Could not read the hub's public network from ipinfo.io" ;;
+    *[Mm]ullvad* | *M247* | *Amazon* | *Google* | *Microsoft* | *Hetzner* | *DigitalOcean* | *OVH* | *Linode* | *Akamai* | *Vultr* | *Contabo*)
+      fail "The hub leaves through a VPN or datacenter network: $hub_org" ;;
+    *) pass "The hub leaves through $hub_org" ;;
+  esac
+  hub_accounts="$(find "$HOME/.cli-proxy-api" -maxdepth 1 -name 'claude-*.json' 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "$hub_accounts" -gt 0 ]; then
+    pass "CLIProxyAPI has $hub_accounts Claude account(s) signed in"
+  else
+    warn "CLIProxyAPI has no Claude account signed in (docs/llm-hub.md)"
+  fi
+  case "$(stat -f '%Lp' "$HOME/.config/cliproxyapi/config.yaml" 2>/dev/null || stat -c '%a' "$HOME/.config/cliproxyapi/config.yaml" 2>/dev/null)" in
+    600) pass "CLIProxyAPI config has mode 600" ;;
+    *) warn "CLIProxyAPI config should have mode 600" ;;
+  esac
+fi
+
 if command -v docker >/dev/null 2>&1; then
   if docker info >/dev/null 2>&1; then
     pass "Docker daemon is reachable"

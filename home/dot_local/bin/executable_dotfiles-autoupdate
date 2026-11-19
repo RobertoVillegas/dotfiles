@@ -97,6 +97,22 @@ if command -v brew >/dev/null 2>&1; then
   if [ "$status" -eq 0 ]; then
     status=$brew_status
   fi
+
+  # A running CLIProxyAPI hub keeps the old binary until it restarts
+  # (docs/llm-hub.md). Restart it once, only when brew moved it to a new version.
+  hub_version_file="$HOME/.local/state/cliproxyapi/version"
+  if [ "$(uname -s)" = "Darwin" ] && [ -f "$hub_version_file" ]; then
+    hub_version="$(brew list --versions cliproxyapi 2>/dev/null || true)"
+    if [ -n "$hub_version" ] && [ "$hub_version" != "$(cat "$hub_version_file")" ]; then
+      for domain in "gui/$(id -u)" "user/$(id -u)"; do
+        if launchctl kickstart -k "$domain/local.cliproxyapi" >/dev/null 2>&1; then
+          printf '%s\n' "$hub_version" >"$hub_version_file"
+          printf '=== %s restarted CLIProxyAPI: %s ===\n' "$(timestamp)" "$hub_version" >>"$log_file"
+          break
+        fi
+      done
+    fi
+  fi
 fi
 
 # Keep the log bounded without pulling in logrotate.

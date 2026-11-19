@@ -76,6 +76,17 @@ Empty output means "no credential": Pi hides that provider's models from
 - `cost`, `contextWindow`, and `maxTokens` are optional but drive the footer
   estimate and the context limit; a model without costs reports free usage.
 
+## Mistral subscription
+
+Mistral is in Pi's catalog, so it needs no `models.json` entry. The
+`@heyhuynhgiabuu/pi-oauth-mistral` package (pinned in
+`run_onchange_after_27-install-pi-packages`) adds the subscription sign-in:
+`/login`, then **Sign in with an account**, then **Mistral**. The login lands
+in `~/.pi/agent/auth.json`, per machine. `/mistral-usage` shows the Vibe Code
+allowance the sign-in draws from, which is separate from the API allowance.
+The package also caps `mistral-large-4` output at 32,768 tokens; Pi's catalog
+declares 262,144.
+
 ## Unmanaged by design
 
 `models.json` is not a template because provider lists differ per machine and

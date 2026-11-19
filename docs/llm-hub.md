@@ -5,7 +5,7 @@ serves them to the rest of the tailnet through
 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). Devboxes keep no
 logins of their own: they point Claude Code (and Codex) at the hub. Every
 request leaves through one residential connection, the logins are refreshed in
-one place, and the hub's usage queue feeds the analytics panels.
+one place, and T3 Code shows the pooled limits of every account.
 
 The setup follows the one in
 [this guide](https://gist.github.com/t3dotgg/59a521d2ee8d70aaf90e280c175072af).
@@ -89,10 +89,25 @@ OAuth callback first: `ssh -L 54545:localhost:54545 <hub>` for Claude (1455
 for Codex's browser login). Then open `https://<hub>.<tailnet>.ts.net:8317/management.html`
 with the management key from `keys.env` and check that every account appears.
 
-## Point a client at the hub
+## Use it from T3 Code
 
-Claude Code reads these from `settings.json` (`~/.claude/settings.json`, or the
-config directory of the profile that should use the hub):
+On the machine whose T3 Code environment runs the agents:
+
+- **Claude:** in **Settings > Providers**, add a Claude instance with its own
+  config directory and these **Environment variables**: `ANTHROPIC_BASE_URL`
+  = `https://<hub>.<tailnet>.ts.net:8317`, `ANTHROPIC_AUTH_TOKEN` = the access
+  key from `keys.env` (marked Sensitive), and `ANTHROPIC_API_KEY` explicitly
+  empty. If that config directory has a cached Anthropic login, run `/logout`
+  in a Claude Code session using it first.
+- **Codex:** pick **Use existing CLI** and point `~/.codex/config.toml` at the
+  hub; **Continue with ChatGPT** bypasses it.
+- **Limits:** **Settings > Providers > Usage providers > Add hub** with the hub
+  URL and the management key. The accounts appear under **Usage > Limits**.
+
+## Point Claude Code at the hub directly
+
+Outside T3 Code, Claude Code reads the same variables from `settings.json`
+(`~/.claude/settings.json`, or the config directory that should use the hub):
 
 ```json
 {
@@ -104,7 +119,7 @@ config directory of the profile that should use the hub):
 ```
 
 Check from the client: `curl -s https://<hub>.<tailnet>.ts.net:8317/v1/models -H "Authorization: Bearer <access key>" | head -c 300`
-should print a JSON model list. The dotfiles do not configure clients yet.
+should print a JSON model list. The dotfiles do not configure clients.
 
 ## Operate it
 

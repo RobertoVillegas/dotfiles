@@ -69,6 +69,7 @@
 - Prefer feature branches and pull requests for protected branches.
 - GitHub CLI may have intentionally restricted permissions; explain a denied permission instead of broadening credentials.
 - Never write tokens, private keys, passwords, or authentication state into a repository.
+- Stacked pull requests: prefer GitHub's native stacks (`gh stack`). With plain PRs whose base is a parent branch, a merge lands in that branch, not trunk: land bottom-up, and right after each merge retarget the next PR to trunk (`gh pr edit <pr> --base <trunk>`) or delete the merged branch so GitHub retargets it. Read the PR back to confirm it merged into trunk.
 {{- if eq .role "devbox" }}
 - Git authentication and signing use a dedicated machine identity configured outside the dotfiles repository.
 {{- end }}

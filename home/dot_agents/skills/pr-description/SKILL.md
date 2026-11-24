@@ -11,7 +11,7 @@ Write for the person deciding whether to review, approve, or deploy the change. 
 
 Read the repository's contribution rules, PR template, and relevant agent instructions. Inspect the actual base-to-head diff and verification results. For stacked PRs, identify the base and merge order; separate this PR's own changes from its dependencies.
 
-When the repository or audience is unfamiliar, read a small sample of recent descriptions by the user or relevant maintainers. Adopt their language and level of detail without copying unsupported claims. The skill is in English; the PR uses the language requested by the user or expected by reviewers. Roberto's aptomx PRs normally use natural Spanish.
+When the repository or audience is unfamiliar, read a small sample of recent descriptions by the user or relevant maintainers. Adopt their language and level of detail without copying unsupported claims. The skill is in English; the PR uses the language requested by the user or expected by reviewers. Roberto's aptomx PRs use natural Spanish and the layout in [`aptomx.md`](aptomx.md).
 
 Before publishing a new PR, search existing issues, PRs (open and closed), and relevant discussions using both the symptom and affected subsystem. Try alternate terms such as the model, error, endpoint, or cache behavior; inspect plausible matches and their diffs. Record the search scope rather than claiming nobody has mentioned the problem anywhere. If work overlaps, explain what is genuinely missing and coordinate with the existing author. Preserve credit and original authorship when taking over work. With no distinct contribution, recommend using the existing PR instead of opening a duplicate.
 
@@ -32,6 +32,16 @@ Use only the sections the reviewer needs:
 
 Give each fact one home. The summary states impact; changes explain behavior; design explains why; verification proves it. Link to an existing PR's explanation instead of copying it into an integration-only PR. Collapse lengthy scenario lists or raw evidence, keeping the verdict and important limitations visible.
 
+### Skimmable bodies
+
+Reviewers scan before they read, so shape the body for scanning:
+
+- One idea per bullet, short enough to fit one line. Break a long paragraph into bullets.
+- Group changes into numbered subsections (`### 1. Topic`) of 3–6 bullets.
+- Put a deviation from the ticket on the bullet of the change it affects, naming what was asked. A separate decisions section that restates them forces the reader to cross-reference.
+- Describe behavior a reviewer can reproduce against a shared environment; ports, local database names, worktrees, SQL, and query plans stay in your notes.
+- Name things with the codebase's exact terms (a column versus a role, a user type versus a permission).
+
 ### Visuals only when they earn their space
 
 Use a before/after table for behavioral differences. When ordering, ownership, state transitions, or component interactions remain difficult to follow, read the neighboring [`show-me` skill](../show-me/SKILL.md) and choose the smallest useful view. Prefer a focused Mermaid sequence/state diagram or code-shape sketch that renders in the PR. Place it next to the decision it explains and verify it against actual code. An illustrative diagram is not runtime evidence. Follow the repository's attachment policy for screenshots, recordings, or HTML artifacts; keep credentials and personal data out of them.
@@ -43,6 +53,8 @@ Use a before/after table for behavioral differences. When ordering, ownership, s
 State what ran, where it ran when relevant, and what was observed. Use exact commands and meaningful outcomes, not a bare "tests pass" or checklist. Separate automated tests, manual API/browser checks, and build/lint/typecheck results; a build does not prove behavior.
 
 For fixes, include the failing scenario and post-change result when actually observed. Bind measurements to the tested version or commit when revisions matter. If verification used several stacked PRs together, say so rather than attributing the result to this PR alone.
+
+When the ticket lists acceptance criteria or required tests, add a folded checklist that maps every item to met, agreed deviation, not met, or covered by another PR, with a short reason for each exception.
 
 Mark untested platforms, unreconstructed packaged clients, external configuration, and unresolved cases as limits. Separate verified facts, inference, and pending work. A test count describes checks run, not complete coverage. Respect the project's existing test policy; describing a PR is not authorization to add tests, run broad suites, deploy, or create infrastructure.
 

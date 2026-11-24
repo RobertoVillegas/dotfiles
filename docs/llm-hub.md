@@ -131,8 +131,10 @@ should print a JSON model list. The dotfiles do not configure clients.
 - Reboots: with FileVault on, the Mac waits at the unlock screen after a
   restart, and neither Tailscale nor the hub runs until someone signs in. For a
   planned restart use `sudo fdesetup authrestart`, which unlocks once.
-- Turn it off: set `llmHub = false`, apply, then
+- Turn it off: set `llmHub = false` in `~/.config/chezmoi/chezmoi.toml`, run
   `launchctl bootout gui/$(id -u)/local.cliproxyapi` and
-  `tailscale serve --https=8317 off`, and delete
-  `~/Library/LaunchAgents/local.cliproxyapi.plist`. The tokens stay in `~/.cli-proxy-api`
-  until you delete them.
+  `tailscale serve --https=8317 off`, delete
+  `~/Library/LaunchAgents/local.cliproxyapi.plist`, and apply. The config,
+  keys, and tokens stay in `~/.config/cliproxyapi` and `~/.cli-proxy-api`
+  until you delete them; `devbox-doctor` skips the hub once the LaunchAgent is
+  gone.

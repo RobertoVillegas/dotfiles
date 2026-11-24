@@ -204,8 +204,9 @@ else
   warn "Tailscale is not connected or its CLI needs setup"
 fi
 
-# CLIProxyAPI hub (docs/llm-hub.md), only where the dotfiles seeded one.
-if [ -f "$HOME/.config/cliproxyapi/config.yaml" ]; then
+# CLIProxyAPI hub (docs/llm-hub.md), only while it is enabled: turning it off
+# removes the LaunchAgent and keeps the config for later.
+if [ -f "$HOME/Library/LaunchAgents/local.cliproxyapi.plist" ]; then
   if lsof -nP -iTCP:8317 -sTCP:LISTEN >/dev/null 2>&1; then
     pass "CLIProxyAPI hub listens on 127.0.0.1:8317"
   else

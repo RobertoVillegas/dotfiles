@@ -1,0 +1,244 @@
+#!/usr/bin/env node
+// executor-pipe — run Executor programs that carry secrets without the values
+// entering the agent's context. Values are read from env files and spliced into
+// the program; every response is redacted before it is printed.
+//
+// Usage:
+//   executor-pipe run <program.js> [--secrets <file.env>]...
+//   executor-pipe resume <requestId> accept|decline [--secrets <file.env>]...
+//   executor-pipe fp <file.env> <NAME>     local fingerprint of one value
+//   executor-pipe selftest                 check the redaction, no network
+//
+// In <program.js>, __NAME__ becomes the JSON string of NAME from the secrets
+// files, and fp(value) returns { len, fp } (the sandbox has no crypto). An
+// unknown __NAME__ is an error, so a typo never sends a literal placeholder.
+//
+// Connection: EXECUTOR_MCP_URL and EXECUTOR_MCP_AUTH, else the "executor"
+// server in ~/.pi/agent/mcp.json (a header starting with "!" runs as a shell
+// command, as Pi does).
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+
+const die = (msg) => {
+	console.error(`executor-pipe: ${msg}`);
+	process.exit(1);
+};
+
+// ---------------------------------------------------------------------------
+// Secrets and redaction
+
+const SECRET_NAME = /(KEY|SECRET|PASS|TOKEN|CREDENTIAL|PRIVATE|AUTH)/i;
+const MASK = "<redacted>";
+
+const readEnvFiles = (files) => {
+	const values = {};
+	for (const file of files) {
+		for (const line of readFileSync(file, "utf8").split("\n")) {
+			const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
+			if (!m) continue;
+			let v = m[2].trim();
+			if (/^(['"]).*\1$/.test(v)) v = v.slice(1, -1);
+			values[m[1]] = v;
+		}
+	}
+	return values;
+};
+
+// Every value from a secrets file (8+ chars) is masked wherever it appears,
+// raw or JSON-escaped. On top of that, values of secret-looking names are
+// masked in NAME=value lines (Dokploy env blocks) and "name": "value" pairs,
+// which catches secrets that were already stored before this call.
+const makeRedactor = (secrets) => {
+	const needles = Object.values(secrets)
+		.filter((v) => v.length >= 8)
+		.flatMap((v) => [v, JSON.stringify(v).slice(1, -1)])
+		.sort((a, b) => b.length - a.length);
+	return (text) => {
+		let s = text;
+		for (const n of needles) s = s.split(n).join(MASK);
+		// NAME=value, value ends at a JSON-escaped newline, a quote or whitespace
+		s = s.replace(
+			/\b([A-Za-z0-9_]*(?:KEY|SECRET|PASS|TOKEN|CREDENTIAL|PRIVATE|AUTH)[A-Za-z0-9_]*)=(?:(?!\\n)[^"\s])+/gi,
+			`$1=${MASK}`,
+		);
+		// "secretName": "value"
+		s = s.replace(
+			/("[A-Za-z0-9_]*(?:key|secret|pass|token|credential|private|auth)[A-Za-z0-9_]*"\s*:\s*)"(?:\\.|[^"\\])*"/gi,
+			`$1"${MASK}"`,
+		);
+		return s;
+	};
+};
+
+const FP_SOURCE = `const fp = (v) => { let h = 0; for (const c of String(v)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return { len: String(v).length, fp: h }; };`;
+const fp = (v) => {
+	let h = 0;
+	for (const c of String(v)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+	return { len: String(v).length, fp: h };
+};
+
+// Runs before every network call: a redactor that leaks is worse than none.
+const selftest = () => {
+	const fake = { FAKE_TOKEN: "fake-token-value", PLAIN_NAME: "plain-value-123" };
+	const redact = makeRedactor(fake);
+	const sample = JSON.stringify({
+		env: "A=1\nDB_PASSWORD=fake-password-value\nAPI_KEY=abc\\def\nB=2\nOTHER=plain-value-123",
+		nested: { apiKey: "zzz-yyy", note: "uses fake-token-value here" },
+	});
+	const out = redact(sample);
+	const leaks = ["fake-password-value", "abc\\\\def", "zzz-yyy", "fake-token-value", "plain-value-123"].filter((v) =>
+		out.includes(v),
+	);
+	const kept = ["A=1", "B=2", "\\nOTHER="].filter((v) => !out.includes(v));
+	if (leaks.length || kept.length) {
+		die(`redaction self-test failed (leaks: ${leaks.join(", ") || "none"}; lost: ${kept.join(", ") || "none"})`);
+	}
+	return out;
+};
+
+// ---------------------------------------------------------------------------
+// MCP over streamable HTTP
+
+const connection = () => {
+	if (process.env.EXECUTOR_MCP_URL) {
+		return {
+			url: process.env.EXECUTOR_MCP_URL,
+			headers: process.env.EXECUTOR_MCP_AUTH ? { Authorization: process.env.EXECUTOR_MCP_AUTH } : {},
+		};
+	}
+	let cfg;
+	try {
+		cfg = JSON.parse(readFileSync(`${homedir()}/.pi/agent/mcp.json`, "utf8")).mcpServers.executor;
+	} catch {
+		die("no connection: set EXECUTOR_MCP_URL or configure mcpServers.executor in ~/.pi/agent/mcp.json");
+	}
+	const headers = {};
+	for (const [k, v] of Object.entries(cfg.headers ?? {})) {
+		headers[k] =
+			typeof v === "string" && v.startsWith("!") ? execSync(v.slice(1), { shell: "/bin/bash", encoding: "utf8" }) : v;
+	}
+	return { url: cfg.url, headers };
+};
+
+const mcp = async (calls) => {
+	const { url, headers } = connection();
+	let session;
+	const rpc = async (body) => {
+		const res = await fetch(url, {
+			method: "POST",
+			headers: {
+				...headers,
+				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
+				...(session ? { "Mcp-Session-Id": session } : {}),
+			},
+			body: JSON.stringify(body),
+		});
+		session = res.headers.get("mcp-session-id") ?? session;
+		const text = await res.text();
+		if (!res.ok) die(`HTTP ${res.status} from Executor`);
+		if (body.id === undefined) return null;
+		const data = text.includes("data:")
+			? text
+					.split("\n")
+					.filter((l) => l.startsWith("data:"))
+					.map((l) => l.slice(5))
+					.pop()
+			: text;
+		return JSON.parse(data);
+	};
+	await rpc({
+		jsonrpc: "2.0",
+		id: 0,
+		method: "initialize",
+		params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "executor-pipe", version: "1" } },
+	});
+	await rpc({ jsonrpc: "2.0", method: "notifications/initialized" });
+	return rpc({ jsonrpc: "2.0", id: 1, method: "tools/call", params: calls });
+};
+
+// Approvals and input requests echo the whole call input: keep what the user
+// needs to decide (tool and redacted input) and drop the rest.
+const summarize = (result) => {
+	const payload = result?.structuredContent ?? result?.content?.map((c) => c.text).join("\n") ?? result;
+	let p = payload;
+	if (typeof p === "string") {
+		try {
+			p = JSON.parse(p);
+		} catch {
+			return p;
+		}
+	}
+	if (p?.status === "approval-required" || p?.status === "input-required") {
+		return JSON.stringify(
+			{ status: p.status, requestId: p.requestId, tool: p.invocation?.tool, input: p.invocation?.input },
+			null,
+			1,
+		);
+	}
+	return JSON.stringify(p);
+};
+
+// ---------------------------------------------------------------------------
+// Commands
+
+const args = process.argv.slice(2);
+const secretFiles = [];
+const rest = [];
+for (let i = 0; i < args.length; i++) {
+	if (args[i] === "--secrets") secretFiles.push(args[++i] ?? die("--secrets needs a file"));
+	else rest.push(args[i]);
+}
+const [cmd, ...pos] = rest;
+
+if (!cmd || cmd === "-h" || cmd === "--help") {
+	console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 19).join("\n").replace(/^\/\/ ?/gm, ""));
+	process.exit(0);
+}
+
+if (cmd === "selftest") {
+	console.log(selftest());
+	console.log("redaction self-test: ok");
+	process.exit(0);
+}
+
+if (cmd === "fp") {
+	const [file, name] = pos;
+	if (!file || !name) die("usage: executor-pipe fp <file.env> <NAME>");
+	const v = readEnvFiles([file])[name];
+	if (v === undefined) die(`${name} is not in ${file}`);
+	console.log(JSON.stringify({ name, ...fp(v) }));
+	process.exit(0);
+}
+
+selftest();
+const secrets = readEnvFiles(secretFiles);
+const redact = makeRedactor(secrets);
+let call;
+if (cmd === "run") {
+	const [file] = pos;
+	if (!file) die("usage: executor-pipe run <program.js> [--secrets <file.env>]...");
+	const missing = new Set();
+	const code = readFileSync(file, "utf8").replace(/__([A-Z][A-Z0-9_]*)__/g, (m, name) => {
+		if (name in secrets) return JSON.stringify(secrets[name]);
+		missing.add(name);
+		return m;
+	});
+	if (missing.size) die(`not in the secrets files: ${[...missing].join(", ")}`);
+	call = { name: "execute", arguments: { code: `${FP_SOURCE}\n${code}` } };
+} else if (cmd === "resume") {
+	const [requestId, action] = pos;
+	if (!requestId || !["accept", "decline", "cancel"].includes(action)) {
+		die("usage: executor-pipe resume <requestId> accept|decline|cancel [--secrets <file.env>]...");
+	}
+	call = {
+		name: "resume",
+		arguments: { requestId, response: { action, ...(action === "accept" ? { content: {} } : {}) } },
+	};
+} else {
+	die(`unknown command: ${cmd}`);
+}
+
+const out = await mcp(call);
+console.log(redact(out.error ? JSON.stringify(out.error) : summarize(out.result)));

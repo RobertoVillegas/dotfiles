@@ -117,6 +117,9 @@ Library/LaunchAgents/local.cliproxyapi.plist
 {{/* aiforui.dev install token, read by run_after_29-install-aiforui-skills.
      The skills it installs are paid content and stay unmanaged too. */}}
 .config/aiforui/**
+{{/* files-upload token (files.roberto.lol). Per-machine secret, set with
+     `files-upload --set-token`; never managed. */}}
+.config/files-upload/**
 {{/* T3 keeps tokens, sessions and databases under ~/.t3; only its settings
      file is managed (modify_settings.json). */}}
 .t3/**

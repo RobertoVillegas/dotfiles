@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# files-upload — upload a file to https://files.roberto.lol and print its public URL.
+# Needs only bash + curl. Auth: $FILES_UPLOAD_TOKEN or ~/.config/files-upload/token.
+set -euo pipefail
+
+BASE="${FILES_UPLOAD_BASE:-https://files.roberto.lol}"
+TOKEN_FILE="${FILES_UPLOAD_TOKEN_FILE:-$HOME/.config/files-upload/token}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  files-upload [options] <file> [dest]
+  files-upload --rm <url-or-key>
+  files-upload --set-token < token-file     # store the upload token (mode 600)
+
+dest (optional):
+  name          use "name" as the slug (extension kept, random suffix added)
+  dir/          put the file under that folder, slug from the file name
+  dir/name      both
+
+Options:
+  --json             print JSON {key,url,viewer,size,contentType}
+  --title "Text"     title for link previews (default: file name)
+  --no-suffix        don't add the random suffix (URL becomes guessable)
+  --overwrite        replace an existing object with the same key
+  --type MIME        force the Content-Type
+  --rm URL|KEY       delete a previously uploaded file
+  --set-token        read the token from stdin into ~/.config/files-upload/token
+  -h, --help
+Env: FILES_UPLOAD_TOKEN, FILES_UPLOAD_TOKEN_FILE, FILES_UPLOAD_BASE
+EOF
+}
+
+die() { echo "files-upload: $*" >&2; exit 1; }
+
+token() {
+  if [[ -n "${FILES_UPLOAD_TOKEN:-}" ]]; then printf '%s' "$FILES_UPLOAD_TOKEN"
+  elif [[ -r "$TOKEN_FILE" ]]; then tr -d '\n\r ' < "$TOKEN_FILE"
+  else die "no token: set FILES_UPLOAD_TOKEN or create $TOKEN_FILE"; fi
+}
+
+slugify() {
+  local s
+  if command -v perl >/dev/null; then
+    s=$(printf '%s' "$1" | perl -CSD -MUnicode::Normalize -pe '$_=NFD($_); s/\pM//g; s/[^\x00-\x7f]//g' 2>/dev/null) || s="$1"
+  else
+    s=$(printf '%s' "$1" | iconv -f UTF-8 -t ASCII//TRANSLIT 2>/dev/null) || s="$1"
+  fi
+  s=$(printf '%s' "$s" | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')
+  printf '%s' "${s:0:60}" | sed -E 's/-+$//'
+}
+
+rand() { # n chars of [a-z0-9]; no pipes (pipefail + SIGPIPE)
+  local chars=abcdefghijklmnopqrstuvwxyz0123456789 out="" b
+  for b in $(od -An -N"${1:-8}" -tu1 /dev/urandom); do out+="${chars:b%36:1}"; done
+  printf '%s' "$out"
+}
+
+urlenc() { # percent-encode UTF-8 bytes, keep slashes
+  local LC_ALL=C s="$1" out="" c i
+  for (( i=0; i<${#s}; i++ )); do
+    c="${s:i:1}"
+    case "$c" in [a-zA-Z0-9._~/-]) out+="$c" ;; *) printf -v c "%d" "'$c"; out+=$(printf "%%%02X" $(( c & 255 ))) ;; esac
+  done
+  printf '%s' "$out"
+}
+
+mime_for() {
+  local f="$1" e
+  e=$(printf '%s' "${f##*.}" | tr '[:upper:]' '[:lower:]')
+  [[ "$f" == *.* ]] || e=""
+  case "$e" in
+    pdf) echo application/pdf ;;
+    png) echo image/png ;; jpg|jpeg) echo image/jpeg ;; gif) echo image/gif ;;
+    webp) echo image/webp ;; avif) echo image/avif ;; svg) echo image/svg+xml ;; heic) echo image/heic ;;
+    mp4|m4v) echo video/mp4 ;; webm) echo video/webm ;; mov) echo video/quicktime ;;
+    mp3) echo audio/mpeg ;; m4a) echo audio/mp4 ;; wav) echo audio/wav ;; ogg|opus) echo audio/ogg ;;
+    txt|log) echo "text/plain; charset=utf-8" ;; md) echo "text/markdown; charset=utf-8" ;;
+    csv) echo "text/csv; charset=utf-8" ;; json) echo "application/json; charset=utf-8" ;;
+    zip) echo application/zip ;; gz|tgz) echo application/gzip ;;
+    docx) echo application/vnd.openxmlformats-officedocument.wordprocessingml.document ;;
+    xlsx) echo application/vnd.openxmlformats-officedocument.spreadsheetml.sheet ;;
+    pptx) echo application/vnd.openxmlformats-officedocument.presentationml.presentation ;;
+    *) if command -v file >/dev/null; then file -b --mime-type "$f"; else echo application/octet-stream; fi ;;
+  esac
+}
+
+json_field() { # minimal extractor for flat JSON string/number fields
+  sed -nE "s/.*\"$1\": *\"?([^\",]*)\"?,?\$/\1/p" | head -1
+}
+
+JSON=0 TITLE="" SUFFIX=1 OVERWRITE=0 FORCE_TYPE="" RM="" ARGS=()
+while (( $# )); do
+  case "$1" in
+    --json) JSON=1 ;;
+    --title) TITLE="${2:?}"; shift ;;
+    --no-suffix) SUFFIX=0 ;;
+    --overwrite) OVERWRITE=1 ;;
+    --type) FORCE_TYPE="${2:?}"; shift ;;
+    --rm) RM="${2:?}"; shift ;;
+    --set-token)
+      t=$(tr -d '\n\r ' ); [[ ${#t} -ge 20 ]] || die "token on stdin is empty or too short"
+      code=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $t" "$BASE/.token-check") || die "cannot reach $BASE"
+      [[ "$code" == 404 ]] || die "token rejected by $BASE (HTTP $code)"
+      mkdir -p "$(dirname "$TOKEN_FILE")"; chmod 700 "$(dirname "$TOKEN_FILE")"
+      (umask 077; printf '%s\n' "$t" > "$TOKEN_FILE"); chmod 600 "$TOKEN_FILE"
+      echo "token saved to $TOKEN_FILE and accepted by $BASE"; exit 0 ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; ARGS+=("$@"); break ;;
+    -*) die "unknown option $1 (see --help)" ;;
+    *) ARGS+=("$1") ;;
+  esac
+  shift
+done
+
+if [[ -n "$RM" ]]; then
+  key="${RM#"$BASE"/}"; key="${key#v/}"
+  curl -fsS -X DELETE -H "Authorization: Bearer $(token)" "$BASE/$(urlenc "$key")" >/dev/null \
+    || die "delete failed for $key"
+  (( JSON )) && printf '{"deleted":"%s"}\n' "$key" || echo "deleted $key"
+  exit 0
+fi
+
+(( ${#ARGS[@]} >= 1 && ${#ARGS[@]} <= 2 )) || { usage >&2; exit 2; }
+src="${ARGS[0]}"; dest="${ARGS[1]:-}"
+[[ -f "$src" && -r "$src" ]] || die "not a readable file: $src"
+
+fname=$(basename "$src")
+ext=""; stem="$fname"
+if [[ "$fname" == *.* && "${fname%.*}" != "" ]]; then
+  ext=$(printf '%s' "${fname##*.}" | tr '[:upper:]' '[:lower:]'); stem="${fname%.*}"
+fi
+
+dir="" name=""
+if [[ -n "$dest" ]]; then
+  if [[ "$dest" == */ ]]; then dir="$dest"; else dir=$(dirname "$dest"); name=$(basename "$dest"); [[ "$dir" == "." ]] && dir=""; fi
+fi
+# sanitize folder path segment by segment
+cleandir=""
+if [[ -n "$dir" ]]; then
+  IFS='/' read -r -a segs <<< "$dir"
+  for s in "${segs[@]}"; do s=$(slugify "$s"); [[ -n "$s" ]] && cleandir+="$s/"; done
+fi
+[[ "$cleandir" == v/* ]] && die "'v/' is reserved"
+if [[ -n "$name" && -n "$ext" && "$(printf '%s' "${name##*.}" | tr '[:upper:]' '[:lower:]')" == "$ext" ]]; then name="${name%.*}"; fi
+slug=$(slugify "${name:-$stem}"); [[ -n "$slug" ]] || slug="file"
+(( SUFFIX )) && slug="$slug-$(rand 8)"
+key="${cleandir}${slug}${ext:+.$ext}"
+
+ctype="${FORCE_TYPE:-$(mime_for "$src")}"
+q=""; (( OVERWRITE )) && q="?overwrite=1"
+
+hdrs=(-H "Authorization: Bearer $(token)" -H "Content-Type: $ctype" -H "X-Filename: $(urlenc "$fname")")
+[[ -n "$TITLE" ]] && hdrs+=(-H "X-Title: $(urlenc "$TITLE")")
+
+resp=$(curl -sS -X PUT "${hdrs[@]}" --data-binary "@$src" -w $'\n%{http_code}' "$BASE/$(urlenc "$key")$q") \
+  || die "upload request failed"
+code="${resp##*$'\n'}"; body="${resp%$'\n'*}"
+[[ "$code" == 201 ]] || die "upload failed (HTTP $code): $body"
+
+if (( JSON )); then
+  printf '%s\n' "$body"
+else
+  printf '%s\n' "$body" | json_field url
+  v=$(printf '%s\n' "$body" | json_field viewer); [[ -n "$v" ]] && echo "$v"
+fi
+exit 0

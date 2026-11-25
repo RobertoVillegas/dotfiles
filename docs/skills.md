@@ -33,6 +33,7 @@ Personal (chezmoi):
 | `herdr` | the output of `herdr --skill` for the pinned Herdr binary |
 | `wait-what` | `mattpocock/skills`, rewritten: plain re-explanation in the conversation's language |
 | `show-me` | `humanlayer/skills`, adapted: no macOS `open`, model-invocable |
+| `files-upload` | publishes files to the personal host files.roberto.lol; pairs with `~/.local/bin/files-upload` |
 | `pr-description` | personal PR-writing workflow: problem, behavior, evidence, and rollout; optional `show-me` diagrams |
 
 Third-party (dotagents): `diagnosing-bugs`, `grilling`, `prototype`, and

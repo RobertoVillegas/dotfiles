@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # files-upload — upload a file to https://files.roberto.lol and print its public URL.
-# Needs only bash + curl. Auth: $FILES_UPLOAD_TOKEN or ~/.config/files-upload/token.
+# Needs only bash + curl (+ openssl for --secret). Auth: $FILES_UPLOAD_TOKEN or ~/.config/files-upload/token.
 set -euo pipefail
 
 BASE="${FILES_UPLOAD_BASE:-https://files.roberto.lol}"
@@ -10,6 +10,7 @@ usage() {
   cat <<'EOF'
 Usage:
   files-upload [options] <file> [dest]
+  files-upload --secret [--expires 7d] [--max-downloads N] <file>
   files-upload --rm <url-or-key>
   files-upload --set-token < token-file     # store the upload token (mode 600)
 
@@ -24,7 +25,13 @@ Options:
   --no-suffix        don't add the random suffix (URL becomes guessable)
   --overwrite        replace an existing object with the same key
   --type MIME        force the Content-Type
-  --rm URL|KEY       delete a previously uploaded file
+  --rm URL|KEY       delete a previously uploaded file (also works for --secret links)
+
+Encrypted shares (for .env, dumps, keys, anything sensitive):
+  --secret           encrypt locally before uploading; the key goes only in the
+                     link after '#', which never reaches the server
+  --expires DUR      lifetime: 30m, 12h, 7d... (default 7d, max 90d)
+  --max-downloads N  stop serving after N downloads (default: unlimited)
   --set-token        read the token from stdin into ~/.config/files-upload/token
   -h, --help
 Env: FILES_UPLOAD_TOKEN, FILES_UPLOAD_TOKEN_FILE, FILES_UPLOAD_BASE
@@ -89,14 +96,80 @@ json_field() { # minimal extractor for flat JSON string/number fields
   sed -nE "s/.*\"$1\": *\"?([^\",]*)\"?,?\$/\1/p" | head -1
 }
 
+tohex() { od -An -v -tx1 | tr -d ' \n'; }
+unhex() { printf "$(printf '%s' "$1" | sed 's/../\\x&/g')"; }
+b64url() { base64 | tr '+/' '-_' | tr -d '=\n'; }
+hmac_hex() { # hmac_hex <hexkey> <message> -> hex digest
+  printf '%s' "$2" | openssl dgst -sha256 -mac HMAC -macopt "hexkey:$1" -binary | tohex
+}
+json_esc() { # escape for a JSON string; control characters become "_"
+  local s; s=$(printf '%s' "$1" | LC_ALL=C tr '\000-\037' '_')
+  s=${s//\\/\\\\}; s=${s//\"/\\\"}
+  printf '%s' "$s"
+}
+duration_secs() { # 30m | 12h | 7d -> seconds
+  [[ "$1" =~ ^([0-9]+)([mhd])$ ]] || die "bad --expires '$1' (use e.g. 30m, 12h, 7d)"
+  local n=$((10#${BASH_REMATCH[1]}))
+  case "${BASH_REMATCH[2]}" in m) echo $(( n * 60 )) ;; h) echo $(( n * 3600 )) ;; d) echo $(( n * 86400 )) ;; esac
+}
+
+# Encrypted share. Format "FRS1" | iv | AES-256-CBC(header "\n" file) | HMAC-SHA256 tag,
+# with encKey = HMAC(K,"enc") and macKey = HMAC(K,"mac"). K travels only in the URL fragment.
+# The page at /s/<id> (files-roberto-lol, src/secret.js) does the same in reverse with WebCrypto.
+secret_upload() {
+  local src="$1" secs max fname ctype k ek mk iv resp code body url expires_at
+  [[ -f "$src" && -r "$src" ]] || die "not a readable file: $src"
+  command -v openssl >/dev/null || die "--secret needs openssl"
+  secs=$(duration_secs "${EXPIRES:-7d}")
+  (( secs >= 60 && secs <= 90 * 86400 )) || die "--expires must be between 1m and 90d"
+  max=""
+  if [[ -n "$MAX_DL" ]]; then
+    [[ "$MAX_DL" =~ ^[0-9]+$ ]] && (( 10#$MAX_DL >= 1 && 10#$MAX_DL <= 1000 )) || die "--max-downloads must be 1..1000"
+    max=$((10#$MAX_DL))
+  fi
+  fname=$(basename "$src")
+  ctype="${FORCE_TYPE:-$(mime_for "$src")}"
+
+  k=$(openssl rand -hex 32)
+  ek=$(hmac_hex "$k" enc); mk=$(hmac_hex "$k" mac)
+  iv=$(openssl rand -hex 16)
+  tmp=$(mktemp -d); trap 'rm -rf "${tmp:-}"' EXIT  # global: the trap runs after this function returns
+  { printf 'FRS1'; unhex "$iv"; } > "$tmp/blob"
+  { printf '{"n":"%s","t":"%s"}\n' "$(json_esc "$fname")" "$(json_esc "$ctype")"; cat "$src"; } \
+    | openssl enc -aes-256-cbc -K "$ek" -iv "$iv" >> "$tmp/blob" || die "encryption failed"
+  openssl dgst -sha256 -mac HMAC -macopt "hexkey:$mk" -binary < "$tmp/blob" > "$tmp/tag"
+  cat "$tmp/tag" >> "$tmp/blob"
+
+  local hdrs=(-H "Authorization: Bearer $(token)" -H "Content-Type: application/octet-stream" -H "X-Expires-In: $secs")
+  [[ -n "$max" ]] && hdrs+=(-H "X-Max-Downloads: $max")
+  resp=$(curl -sS -X POST "${hdrs[@]}" --data-binary "@$tmp/blob" -w $'\n%{http_code}' "$BASE/s") \
+    || die "upload request failed"
+  code="${resp##*$'\n'}"; body="${resp%$'\n'*}"
+  [[ "$code" == 201 ]] || die "upload failed (HTTP $code): $body"
+  url="$(printf '%s\n' "$body" | json_field url)#$(unhex "$k" | b64url)"
+  expires_at=$(printf '%s\n' "$body" | json_field expiresAt)
+
+  if (( JSON )); then
+    printf '{"url":"%s","expiresAt":"%s","maxDownloads":%s,"size":%s}\n' \
+      "$url" "$expires_at" "${max:-null}" "$(printf '%s\n' "$body" | json_field size)"
+  else
+    echo "$url"
+    echo "encrypted · expires $expires_at · downloads: ${max:-unlimited}" >&2
+  fi
+}
+
 JSON=0 TITLE="" SUFFIX=1 OVERWRITE=0 FORCE_TYPE="" RM="" ARGS=()
+SECRET=0 EXPIRES="" MAX_DL="" PLAIN_OPTS=()
 while (( $# )); do
   case "$1" in
     --json) JSON=1 ;;
-    --title) TITLE="${2:?}"; shift ;;
-    --no-suffix) SUFFIX=0 ;;
-    --overwrite) OVERWRITE=1 ;;
+    --title) TITLE="${2:?}"; PLAIN_OPTS+=(--title); shift ;;
+    --no-suffix) SUFFIX=0; PLAIN_OPTS+=(--no-suffix) ;;
+    --overwrite) OVERWRITE=1; PLAIN_OPTS+=(--overwrite) ;;
     --type) FORCE_TYPE="${2:?}"; shift ;;
+    --secret) SECRET=1 ;;
+    --expires) EXPIRES="${2:?}"; shift ;;
+    --max-downloads) MAX_DL="${2:?}"; shift ;;
     --rm) RM="${2:?}"; shift ;;
     --set-token)
       t=$(tr -d '\n\r ' ); [[ ${#t} -ge 20 ]] || die "token on stdin is empty or too short"
@@ -114,10 +187,18 @@ while (( $# )); do
 done
 
 if [[ -n "$RM" ]]; then
-  key="${RM#"$BASE"/}"; key="${key#v/}"
+  key="${RM%%#*}"; key="${key#"$BASE"/}"; key="${key#v/}"
   curl -fsS -X DELETE -H "Authorization: Bearer $(token)" "$BASE/$(urlenc "$key")" >/dev/null \
     || die "delete failed for $key"
   (( JSON )) && printf '{"deleted":"%s"}\n' "$key" || echo "deleted $key"
+  exit 0
+fi
+
+(( SECRET )) || [[ -z "$EXPIRES$MAX_DL" ]] || die "--expires and --max-downloads need --secret"
+if (( SECRET )); then
+  (( ${#PLAIN_OPTS[@]} == 0 )) || die "${PLAIN_OPTS[0]} does not apply to --secret"
+  (( ${#ARGS[@]} == 1 )) || die "--secret takes exactly one file and no dest"
+  secret_upload "${ARGS[0]}"
   exit 0
 fi
 

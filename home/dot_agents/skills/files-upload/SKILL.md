@@ -7,7 +7,7 @@ description: Publish a local file at a public https://files.roberto.lol URL and 
 
 `files-upload` uploads a file to the public file host and prints its URL. It needs only bash and curl, so it runs on the workstation and the devbox the same way.
 
-Everything you upload is **public**. Anyone with the link can open it. The random suffix keeps the URL unguessable, not secret. Do not upload credentials, `.env` files, private keys, or personal data unless the user explicitly asks you to.
+A normal upload is **public**. Anyone with the link can open it. The random suffix keeps the URL unguessable, not secret. For credentials, `.env` files, database dumps, private keys, or personal data, use `--secret` (below), and only when the user asks you to share that file.
 
 ## Usage
 
@@ -22,6 +22,21 @@ files-upload --rm https://files.roberto.lol/clients/acme/report-x8k2m1pq.pdf   #
 
 Output: line 1 is the direct URL. For PDFs, images and video, line 2 is the viewer URL (`/v/...`).
 
+## Sensitive files: `--secret`
+
+```bash
+files-upload --secret prod.env                          # expires in 7 days, unlimited downloads
+files-upload --secret --expires 24h dump.sql            # 30m, 12h, 7d... up to 90d
+files-upload --secret --max-downloads 1 id_ed25519      # stops working after 1 download
+files-upload --rm 'https://files.roberto.lol/s/<id>#<key>'   # delete it early
+```
+
+- It encrypts on this machine (needs `openssl`) and prints one link, `https://files.roberto.lol/s/<id>#<key>`. The key is the part after `#`; browsers never send it, so the server only stores ciphertext. Give the user the **whole** link, `#` part included, and never post it anywhere except where the user asked.
+- The recipient opens the link and presses one button; the browser decrypts and saves the file with its original name. Text files also show on the page with a copy button. Nothing to install.
+- Every press of the button counts as a download (also after a reload). Opening the page or a chat link preview does not count.
+- `--title`, `--no-suffix`, `--overwrite` and a dest argument don't apply to `--secret`. `--json` prints `{url,expiresAt,maxDownloads,size}`.
+- Expiry and the download count are enforced by the server, and an hourly job deletes expired and exhausted files.
+
 ## Which link to give the user
 
 - **PDF:** give the `/v/` viewer URL. It renders with PDF.js on every device, including Android Chrome, which otherwise downloads the PDF, and it shows a clean title in chat link previews. Mention the direct URL only if they need the raw file.
@@ -34,5 +49,5 @@ Output: line 1 is the direct URL. For PDFs, images and video, line 2 is the view
 - To give a machine the token, run this on the workstation: `ssh <host> '~/.local/bin/files-upload --set-token' < ~/.config/files-upload/token`. It checks the token against the server before saving it.
 - Uploads go through the Worker, so a single file can be at most about 100 MB.
 - Re-uploading the same file creates a new URL. To replace a file in place, pass its existing key without the extension as dest, plus `--overwrite --no-suffix`. For example: `files-upload --overwrite --no-suffix new.pdf clients/acme/report-x8k2m1pq`.
-- Nothing ever lists the bucket. If you need the URL later, record it when you upload.
+- Nothing ever lists the bucket. If you need the URL later, record it when you upload. For `--secret` links the key exists only in the printed link: if it is lost, the file cannot be decrypted.
 - The server (Worker and R2) lives in `~/Developer/files-roberto-lol` on the workstation. This script and this skill live in the dotfiles.

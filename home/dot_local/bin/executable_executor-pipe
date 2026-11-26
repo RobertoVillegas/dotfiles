@@ -4,14 +4,19 @@
 // the program; every response is redacted before it is printed.
 //
 // Usage:
-//   executor-pipe run <program.js> [--secrets <file.env>]...
-//   executor-pipe resume <requestId> accept|decline [--secrets <file.env>]...
+//   executor-pipe run <program.js> [--secrets <file.env>]... [--show NAME,...]
+//   executor-pipe resume <requestId> accept|decline [--secrets <file.env>]... [--show NAME,...]
 //   executor-pipe fp <file.env> <NAME>     local fingerprint of one value
 //   executor-pipe selftest                 check the redaction, no network
 //
 // In <program.js>, __NAME__ becomes the JSON string of NAME from the secrets
 // files, and fp(value) returns { len, fp } (the sandbox has no crypto). An
 // unknown __NAME__ is an error, so a typo never sends a literal placeholder.
+//
+// Output masks the value of every NAME=value line (env blocks), whatever the
+// name, up to the end of the line; --show lists the names whose values may be
+// printed. It also masks every value from --secrets, user:pass@ in URLs, and
+// "name": "value" pairs whose name looks secret.
 //
 // Connection: EXECUTOR_MCP_URL and EXECUTOR_MCP_AUTH, else the "executor"
 // server in ~/.pi/agent/mcp.json (a header starting with "!" runs as a shell
@@ -28,7 +33,6 @@ const die = (msg) => {
 // ---------------------------------------------------------------------------
 // Secrets and redaction
 
-const SECRET_NAME = /(KEY|SECRET|PASS|TOKEN|CREDENTIAL|PRIVATE|AUTH)/i;
 const MASK = "<redacted>";
 
 const readEnvFiles = (files) => {
@@ -45,29 +49,46 @@ const readEnvFiles = (files) => {
 	return values;
 };
 
-// Every value from a secrets file (8+ chars) is masked wherever it appears,
-// raw or JSON-escaped. On top of that, values of secret-looking names are
-// masked in NAME=value lines (Dokploy env blocks) and "name": "value" pairs,
-// which catches secrets that were already stored before this call.
-const makeRedactor = (secrets) => {
+// JSON-escaped spellings of a value, as it may appear inside a response.
+const spellings = (v) => {
+	const json = JSON.stringify(v).slice(1, -1);
+	const ascii = json.replace(/[^\x20-\x7e]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+	return [...new Set([v, json, ascii])];
+};
+
+// NAME=value at the start of a line; the value runs to the end of the line,
+// spaces and quotes included. Applied to real text: JSON responses are parsed
+// and each string is redacted after unescaping.
+const ENV_LINE = /(^|\n)([A-Z][A-Z0-9_]*)=([^\n]*)/g;
+// Same, for text that is not JSON but carries escaped newlines (error messages).
+const ENV_LINE_ESCAPED = /(\\n)([A-Z][A-Z0-9_]*)=((?:\\[^n]|[^\\\n])*)/g;
+const URL_CREDENTIALS = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi;
+const SECRET_KEY_NAME = /(key|secret|pass|token|credential|private|auth|dsn|salt|sign|cookie|session|jwt|cert)/i;
+
+const makeRedactor = (secrets, show = new Set()) => {
 	const needles = Object.values(secrets)
-		.filter((v) => v.length >= 8)
-		.flatMap((v) => [v, JSON.stringify(v).slice(1, -1)])
+		.filter((v) => v.length >= 4)
+		.flatMap(spellings)
 		.sort((a, b) => b.length - a.length);
-	return (text) => {
-		let s = text;
+	const text = (t) => {
+		let s = t;
 		for (const n of needles) s = s.split(n).join(MASK);
-		// NAME=value, value ends at a JSON-escaped newline, a quote or whitespace
-		s = s.replace(
-			/\b([A-Za-z0-9_]*(?:KEY|SECRET|PASS|TOKEN|CREDENTIAL|PRIVATE|AUTH)[A-Za-z0-9_]*)=(?:(?!\\n)[^"\s])+/gi,
-			`$1=${MASK}`,
-		);
-		// "secretName": "value"
-		s = s.replace(
-			/("[A-Za-z0-9_]*(?:key|secret|pass|token|credential|private|auth)[A-Za-z0-9_]*"\s*:\s*)"(?:\\.|[^"\\])*"/gi,
-			`$1"${MASK}"`,
-		);
-		return s;
+		const mask = (m, pre, name, value) => (show.has(name) || value === "" ? m : `${pre}${name}=${MASK}`);
+		s = s.replace(ENV_LINE, mask).replace(ENV_LINE_ESCAPED, mask);
+		return s.replace(URL_CREDENTIALS, `$1${MASK}@`);
+	};
+	const walk = (v, key) => {
+		if (typeof v === "string") return key && SECRET_KEY_NAME.test(key) && !show.has(key) ? MASK : text(v);
+		if (Array.isArray(v)) return v.map((x) => walk(x));
+		if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [text(k), walk(x, k)]));
+		return v;
+	};
+	return (out) => {
+		try {
+			return JSON.stringify(walk(JSON.parse(out)), null, 1);
+		} catch {
+			return text(out);
+		}
 	};
 };
 
@@ -79,18 +100,45 @@ const fp = (v) => {
 };
 
 // Runs before every network call: a redactor that leaks is worse than none.
+// Cases come from review: quoted values, spaces, names that do not look
+// secret, credentials inside URLs, non-ASCII values escaped as \uXXXX.
 const selftest = () => {
-	const fake = { FAKE_TOKEN: "fake-token-value", PLAIN_NAME: "plain-value-123" };
-	const redact = makeRedactor(fake);
+	const fake = { FAKE_TOKEN: "fake-token-value", SHORT: "abcd", ACCENT: "contraseña-falsa" };
+	const redact = makeRedactor(fake, new Set(["PUBLIC_NAME"]));
+	const env = [
+		"PUBLIC_NAME=visible-value",
+		'DB_PASSWORD="quoted secret value"',
+		"SECRET_KEY=has space inside",
+		"DATABASE_URL=postgres://dbuser:dbpass-fake@db:5432/app",
+		"SENTRY_DSN=https://fakedsnkey@sentry.example/1",
+		"SESSION_SALT=salty-fake-salt",
+		"JWT=eyJfake.jwt.value",
+		"EMPTY=",
+	].join("\n");
 	const sample = JSON.stringify({
-		env: "A=1\nDB_PASSWORD=fake-password-value\nAPI_KEY=abc\\def\nB=2\nOTHER=plain-value-123",
-		nested: { apiKey: "zzz-yyy", note: "uses fake-token-value here" },
+		env,
+		nested: { apiKey: "fake-api-key-value", sentryDsn: "fake-dsn-value", note: "uses fake-token-value and abcd" },
+		url: "see https://someuser:fake-url-pass@host.example/path",
 	});
-	const out = redact(sample);
-	const leaks = ["fake-password-value", "abc\\\\def", "zzz-yyy", "fake-token-value", "plain-value-123"].filter((v) =>
-		out.includes(v),
-	);
-	const kept = ["A=1", "B=2", "\\nOTHER="].filter((v) => !out.includes(v));
+	const escaped = JSON.stringify({ v: "x contraseña-falsa y" }).replace(/ñ/g, "\\u00f1"); // parsed back to ñ
+	const errorText = 'Error: bad env "A=1\\nDB_PASSWORD=\\"quoted secret value\\"\\nB=2"';
+	const out = `${redact(sample)}\n${redact(escaped)}\n${redact(env)}\n${redact(errorText)}`;
+	const leaks = [
+		"quoted secret value",
+		"space inside",
+		"dbpass-fake",
+		"fakedsnkey",
+		"salty-fake-salt",
+		"eyJfake",
+		"fake-api-key-value",
+		"fake-dsn-value",
+		"fake-token-value",
+		"abcd",
+		"fake-url-pass",
+		"someuser",
+		"contrase",
+	].filter((v) => out.includes(v));
+	const kept = ["PUBLIC_NAME=visible-value", "EMPTY=", "DB_PASSWORD=", "DATABASE_URL="].filter((v) => !out.includes(v));
 	if (leaks.length || kept.length) {
 		die(`redaction self-test failed (leaks: ${leaks.join(", ") || "none"}; lost: ${kept.join(", ") || "none"})`);
 	}
@@ -185,15 +233,18 @@ const summarize = (result) => {
 
 const args = process.argv.slice(2);
 const secretFiles = [];
+const show = new Set();
 const rest = [];
 for (let i = 0; i < args.length; i++) {
 	if (args[i] === "--secrets") secretFiles.push(args[++i] ?? die("--secrets needs a file"));
+	else if (args[i] === "--show") for (const n of (args[++i] ?? die("--show needs names")).split(",")) show.add(n.trim());
 	else rest.push(args[i]);
 }
 const [cmd, ...pos] = rest;
 
 if (!cmd || cmd === "-h" || cmd === "--help") {
-	console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 19).join("\n").replace(/^\/\/ ?/gm, ""));
+	const lines = readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1);
+	console.log(lines.slice(0, lines.findIndex((l) => !l.startsWith("//"))).join("\n").replace(/^\/\/ ?/gm, ""));
 	process.exit(0);
 }
 
@@ -214,13 +265,13 @@ if (cmd === "fp") {
 
 selftest();
 const secrets = readEnvFiles(secretFiles);
-const redact = makeRedactor(secrets);
+const redact = makeRedactor(secrets, show);
 let call;
 if (cmd === "run") {
 	const [file] = pos;
 	if (!file) die("usage: executor-pipe run <program.js> [--secrets <file.env>]...");
 	const missing = new Set();
-	const code = readFileSync(file, "utf8").replace(/__([A-Z][A-Z0-9_]*)__/g, (m, name) => {
+	const code = readFileSync(file, "utf8").replace(/__([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)__/g, (m, name) => {
 		if (name in secrets) return JSON.stringify(secrets[name]);
 		missing.add(name);
 		return m;

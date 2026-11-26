@@ -17,7 +17,7 @@ A secret is **exposed** once its value is in your context: you typed it, a tool 
 1. **Values live in files.** The secret goes in an env file with mode 600, written by the user, by a tool, or by a pipe (`umask 077; … > file`). Done when you have a path and have never printed its contents. Check a value with `executor-pipe fp <file> <NAME>` (length and fingerprint) or `awk -F= '{print $1, length($2)}'`.
 2. **Read names, not values.** To inspect stored config, run a program that returns names, lengths or `fp(value)`, never the value. The MCP `execute` tool is fine for this when the program filters before returning.
 3. **Write through the pipe.** Any write that carries a secret, or resends a block that holds secrets, goes through `executor-pipe run <program.js> --secrets <file>`, with `__NAME__` where the value belongs. Use the MCP tools only for calls whose full input you could paste in public.
-4. **Review the redacted approval.** Read the `input` it prints. Everything public should be legible and every secret `<redacted>`. If the mask hides more than the secrets, or anything looks wrong, `executor-pipe resume <id> decline`, fix the program, and run it again. Accept only what you have read: `executor-pipe resume <id> accept --secrets <file>`.
+4. **Review the redacted approval.** Every `NAME=value` line prints as `NAME=<redacted>` unless you name it in `--show`, so pass the public names you need to check (`--show S3_BUCKET,EMDASH_STORAGE`). Done when every name you expect is present, every `--show` value is right, and nothing else is legible. Otherwise `executor-pipe resume <id> decline`, fix the program, and run it again. Accept with `executor-pipe resume <id> accept --secrets <file>`.
 5. **Verify by fingerprint.** Read the stored value back as `fp(value)` and compare it with `executor-pipe fp <file> <NAME>`. Done when length and fingerprint match.
 
 The first time you write to a new kind of target, rehearse steps 3–5 with a fake secret on a throwaway target (a scratch Dokploy environment, a test key), then delete it.
@@ -25,7 +25,8 @@ The first time you write to a new kind of target, rehearse steps 3–5 with a fa
 ## Rules
 
 - The fingerprint is a collision-prone checksum for "did the whole value arrive". It identifies nothing, so returning it is safe; a hash of a short password is not. Return length and `fp` only.
-- `executor-pipe` runs its redaction self-test before every call and refuses to send if it fails. A new secret format (a different separator, a multi-line key) gets a fake-value rehearsal first, since the mask matches `NAME=value` lines, `"name": "value"` pairs and the exact values from `--secrets`.
+- The mask is an allowlist: env-style values are hidden by default because a secret's name says nothing reliable (`DATABASE_URL`, `JWT`, `SENTRY_DSN`). On top, it hides the exact values from `--secrets`, `user:pass@` in URLs, and JSON fields with secret-looking keys. A secret in another shape (a multi-line key, a bare value with no name) is hidden only if it is in a `--secrets` file, so rehearse new formats with a fake value.
+- `executor-pipe` runs its redaction self-test before every call and refuses to send if it fails.
 - Deploy, restart and other calls with no secret in their input can stay on the MCP tools.
 
 ## When a secret is exposed

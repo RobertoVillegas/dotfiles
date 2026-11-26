@@ -4,8 +4,8 @@
 // the program; nothing from the response is printed unless marked public.
 //
 // Usage:
-//   executor-pipe run <program.js> [--secrets <file.env>]... [--show NAME,...]
-//   executor-pipe resume <requestId> accept|decline|cancel [--secrets <file.env>]... [--show NAME,...]
+//   executor-pipe run <program.js> [--secrets <file.env>]... [--show NAME,...] [--show-errors]
+//   executor-pipe resume <requestId> accept|decline|cancel [--secrets <file.env>]... [--show NAME,...] [--show-errors]
 //   executor-pipe fp <file.env> <NAME>     local fingerprint of one value
 //   executor-pipe selftest                 check the redaction, no network
 //
@@ -16,16 +16,16 @@
 //   fp(value)   { len, fp } of a value, already public (the sandbox has no crypto)
 //
 // Output is deny by default. Every string and number in the program's result
-// and in an approval's input prints as <redacted:N> (N = length) unless:
-//   - the program wrapped it in pub(), or
-//   - its object key, or its env name in a NAME=value / NAME: value line, is
-//     listed in --show.
-// Env-like strings print one line per entry as NAME=<redacted:N>, so an
-// approval shows which names it sets. Object keys, booleans and the response
-// envelope (status, requestId, tool, outcomes) print as they are, and so does
-// the identifier in a {name|key, value} pair. Error messages and other free
-// text print with every --secrets value masked and, in each line, everything
-// after the first "=" or ":" masked.
+// and in an approval's input prints as <redacted:N> (N = length) unless the
+// program wrapped it in pub(), or its object key or env name is in --show
+// (--show KEY reveals everything under that key). Multi-line strings print one
+// line per entry as NAME=<redacted:N> when the line is an UPPER_SNAKE_CASE
+// name, "=" and a value; any other line, and any single-line string, is masked
+// whole, so a base64 value with "=" padding never passes as a name. The
+// identifier of a {name|key, value} pair, object keys, booleans and the
+// envelope (status, request ID, tool, call outcomes) print as they are. Error
+// messages and non-JSON replies are masked whole; --show-errors prints them
+// with only the --secrets values masked.
 //
 // Connection: EXECUTOR_MCP_URL and EXECUTOR_MCP_AUTH, else the "executor"
 // server in ~/.pi/agent/mcp.json (a header starting with "!" runs as a shell
@@ -72,17 +72,19 @@ const fp = (v) => {
 
 const hidden = (v) => `<redacted:${String(v).length}>`;
 
-// "NAME=value", "export NAME=value", "NAME: value", with any indentation.
-const ENTRY = /^\s*(?:export\s+)?([^\s=:]+)\s*[=:]/;
+// An env entry worth naming: optional indentation and "export", an
+// UPPER_SNAKE_CASE name, "=" and a value that is not more "=" (base64 padding).
+const ENTRY = /^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=(?=\s*[^=\s])/;
 
 // JSON-escaped spellings of a value, as it may appear in an error message.
 const spellings = (v) => {
 	const json = JSON.stringify(v).slice(1, -1);
 	const ascii = json.replace(/[^\x20-\x7e]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
-	return [...new Set([v, json, ascii])];
+	const unpadded = v.replace(/=+$/, "");
+	return [...new Set([v, json, ascii, ...(unpadded.length >= 8 ? [unpadded] : [])])];
 };
 
-const makeRedactor = (secrets, show = new Set()) => {
+const makeRedactor = (secrets, show = new Set(), showErrors = false) => {
 	const needles = Object.values(secrets)
 		.filter((v) => v.length >= 4)
 		.flatMap(spellings)
@@ -93,23 +95,20 @@ const makeRedactor = (secrets, show = new Set()) => {
 		return s;
 	};
 
-	// A string with several lines, or one entry, renders as its entry names.
+	// Only a multi-line string can be an env block; it renders as its entry names.
 	const maskString = (v, key) => {
 		if (key !== undefined && show.has(key) && !v.includes("\n")) return scrub(v);
 		const lines = v.split(/\r?\n/);
-		const entries = lines.map((l) => ENTRY.exec(l));
-		if (entries.some(Boolean)) {
-			return lines
-				.map((l, i) => {
-					const m = entries[i];
-					if (!m) return l.trim() === "" ? l : hidden(l);
-					const value = l.slice(m[0].length);
-					const single = !/\s\S+\s*[=:]/.test(value.trim());
-					return show.has(m[1]) && single ? scrub(l) : `${m[0]}${hidden(value.trim())}`;
-				})
-				.join("\n");
-		}
-		return hidden(v);
+		if (lines.length < 2) return hidden(v);
+		return lines
+			.map((l) => {
+				const m = ENTRY.exec(l);
+				if (!m) return l.trim() === "" ? l : hidden(l);
+				const value = l.slice(m[0].length).trim();
+				const single = !/\s\S+\s*[=:]/.test(value);
+				return show.has(m[1]) && single ? scrub(l) : `${m[0]}${hidden(value)}`;
+			})
+			.join("\n");
 	};
 
 	const mask = (v, key, revealed = false) => {
@@ -125,7 +124,8 @@ const makeRedactor = (secrets, show = new Set()) => {
 				Object.entries(v).map(([k, x]) => {
 					// The pair's name is an identifier, not data: print it so an approval
 					// shows which variable it sets.
-					const isPairName = "value" in v && (k === "name" || k === "key") && /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(String(x));
+					const isPairName =
+						"value" in v && (k === "name" || k === "key") && typeof x === "string" && /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(x);
 					const shown =
 						revealed || isPairName || show.has(k) || (k === "value" && pairName !== undefined && show.has(pairName));
 					return [scrub(k), mask(x, k, shown)];
@@ -135,18 +135,8 @@ const makeRedactor = (secrets, show = new Set()) => {
 		return hidden(String(v));
 	};
 
-	// Free text (errors, non-JSON replies): masked secrets, then in every line
-	// everything after the first "=" or ":" unless that entry is shown.
-	const maskText = (t) =>
-		scrub(t)
-			.split(/\r?\n|\\n/)
-			.map((l) => {
-				const m = ENTRY.exec(l);
-				if (m && show.has(m[1]) && !/\s\S+\s*[=:]/.test(l.slice(m[0].length).trim())) return l;
-				const cut = l.search(/[=:]/);
-				return cut === -1 ? l : `${l.slice(0, cut + 1)} <redacted>`;
-			})
-			.join("\n");
+	// Free text (errors, non-JSON replies) is masked whole unless --show-errors.
+	const maskText = (t) => (showErrors ? scrub(t) : hidden(t));
 
 	return { mask, maskText, scrub };
 };
@@ -154,6 +144,7 @@ const makeRedactor = (secrets, show = new Set()) => {
 // The envelope keeps only fields that never carry call data.
 const render = (result, redactor) => {
 	const { mask, maskText } = redactor;
+	const status = (v) => (typeof v === "string" && /^[a-z][a-z-]{0,31}$/.test(v) ? v : hidden(String(v)));
 	let p = result?.structuredContent ?? result?.content?.map((c) => c.text).join("\n") ?? result;
 	if (typeof p === "string") {
 		try {
@@ -168,20 +159,43 @@ const render = (result, redactor) => {
 	const e = p?.execution;
 	if (e) {
 		return {
-			status: p.status,
-			ok: e.ok,
+			status: status(p.status),
+			ok: e.ok === true,
 			...(e.ok ? { value: mask(e.value) } : { error: { kind: e.error?.kind, message: maskText(e.error?.message ?? "") } }),
-			toolCalls: (e.toolCalls ?? []).map((c) => ({ name: c.name, outcome: c.outcome })),
+			toolCalls: (Array.isArray(e.toolCalls) ? e.toolCalls : []).map((c) => ({
+				name: typeof c?.name === "string" && /^[a-z][A-Za-z0-9_.-]{0,127}$/.test(c.name) ? c.name : hidden(String(c?.name)),
+				outcome: status(c?.outcome),
+			})),
 		};
 	}
-	return { status: p?.status, response: mask(p) };
+	return { status: status(p?.status), response: mask(p) };
 };
 
 // Runs before every network call: a redactor that leaks is worse than none.
 // Each shape below leaked in an earlier version or in review.
 const selftest = () => {
 	const S = "Zq9fakeSECRETzq";
-	const redactor = makeRedactor({ FAKE: "fake-file-secret" }, new Set(["PUBLIC_NAME", "bucket", "applicationId"]));
+	// base64 fakes built at run time (literals trip gitleaks); lengths chosen
+	// for "==" and "=" padding.
+	const b64 = (t) => Buffer.from(t).toString("base64");
+	const B = {
+		config: b64("fake-config-x"), // 13 bytes: ==
+		pair: b64("fake-pair-xy"), // 12 bytes: none -> add one below
+		k8s: b64("fake-k8s-pass"), // ==
+		loose: b64("fake-loose-xy"), // ==
+		pem1: b64("fake-pem-line-1"), // =
+		pem2: b64("fake-pem-line-22"), // ==
+		env: b64("fake-env-value-x"), // ==
+		bare: b64("fake-bare-line"), // =
+	};
+	B.pair = b64("fake-pair-xyz1"); // 14 bytes: =
+	const PEM = ["-----BEGIN ", "PRIVATE KEY-----"].join("");
+	const PEM_END = ["-----END ", "PRIVATE KEY-----"].join("");
+	const redactor = makeRedactor(
+		{ FAKE: "fake-file-secret", PADDED: "fake-padded-secret==" },
+		new Set(["PUBLIC_NAME", "bucket", "applicationId"]),
+	);
+	const loud = makeRedactor({ PADDED: "fake-padded-secret==" }, new Set(), true);
 	const envBlock = [
 		"PUBLIC_NAME=visible-value",
 		`DB_PASSWORD="quoted ${S}"`,
@@ -216,6 +230,13 @@ const selftest = () => {
 		keyValue: [{ key: "STRIPE_SK", value: S }],
 		"contraseña": S,
 		start: `${S}\nsecond line`,
+		config: { SESSION_SECRET: B.config },
+		pairB64: [{ name: "SESSION_SECRET", value: B.pair }],
+		k8s: { data: { password: B.k8s } },
+		looseB64: [B.loose],
+		pem: `${PEM}\n${B.pem1}\n${B.pem2}\n${PEM_END}`,
+		envB64: `A_NAME=x\nSESSION_SECRET=${B.env}\n${B.bare}`,
+		badPairName: [{ name: [S], value: 1 }],
 		public: { [PUBLIC]: { names: ["DB_PASSWORD"], fp: { len: 3, fp: 9 } } },
 	};
 	const out = [
@@ -223,9 +244,16 @@ const selftest = () => {
 		JSON.stringify(render({ structuredContent: { status: "completed", execution: { ok: true, value: input, toolCalls: [] } } }, redactor)),
 		JSON.stringify(render({ structuredContent: { status: "completed", execution: { ok: false, error: { kind: "X", message: `bad "A=1\\nDB_PASSWORD=${S}\\nfake-file-secret"` } } } }, redactor)),
 		render({ content: [{ text: `not json: export X=${S}\nfake-file-secret` }] }, redactor),
+		loud.maskText("--show-errors keeps prose but not fake-padded-secret= or fake-padded-secret=="),
 	].join("\n");
-	const leaks = [S, "fake-file-secret", "1234"].filter((v) => out.includes(v));
-	const kept = ["visible-value", "app-visible-id", "visible-bucket", "visible-bucket-2", '"name":"DB_PASSWORD"', '"key":"STRIPE_SK"', "EXPORTED", "yaml_key", "CONTRASEÑA", '"names"'].filter(
+	const leaks = [
+		S,
+		"fake-file-secret",
+		"1234",
+		...Object.values(B).map((v) => v.replace(/=+$/, "")),
+		"fake-padded-secret",
+	].filter((v) => out.includes(v));
+	const kept = ["visible-value", "app-visible-id", "visible-bucket", "visible-bucket-2", '"name":"DB_PASSWORD"', '"key":"STRIPE_SK"', "export EXPORTED=", "SESSION_SECRET=<redacted", '"names"'].filter(
 		(v) => !out.includes(v),
 	);
 	if (leaks.length || kept.length) {
@@ -301,9 +329,11 @@ const mcp = async (calls) => {
 const args = process.argv.slice(2);
 const secretFiles = [];
 const show = new Set();
+let showErrors = false;
 const rest = [];
 for (let i = 0; i < args.length; i++) {
 	if (args[i] === "--secrets") secretFiles.push(args[++i] ?? die("--secrets needs a file"));
+	else if (args[i] === "--show-errors") showErrors = true;
 	else if (args[i] === "--show") for (const n of (args[++i] ?? die("--show needs names")).split(",")) show.add(n.trim());
 	else rest.push(args[i]);
 }
@@ -332,7 +362,7 @@ if (cmd === "fp") {
 
 selftest();
 const secrets = readEnvFiles(secretFiles);
-const redactor = makeRedactor(secrets, show);
+const redactor = makeRedactor(secrets, show, showErrors);
 let call;
 if (cmd === "run") {
 	const [file] = pos;

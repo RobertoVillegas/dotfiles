@@ -1,22 +1,31 @@
 #!/usr/bin/env node
 // executor-pipe — run Executor programs that carry secrets without the values
 // entering the agent's context. Values are read from env files and spliced into
-// the program; every response is redacted before it is printed.
+// the program; nothing from the response is printed unless marked public.
 //
 // Usage:
 //   executor-pipe run <program.js> [--secrets <file.env>]... [--show NAME,...]
-//   executor-pipe resume <requestId> accept|decline [--secrets <file.env>]... [--show NAME,...]
+//   executor-pipe resume <requestId> accept|decline|cancel [--secrets <file.env>]... [--show NAME,...]
 //   executor-pipe fp <file.env> <NAME>     local fingerprint of one value
 //   executor-pipe selftest                 check the redaction, no network
 //
 // In <program.js>, __NAME__ becomes the JSON string of NAME from the secrets
-// files, and fp(value) returns { len, fp } (the sandbox has no crypto). An
-// unknown __NAME__ is an error, so a typo never sends a literal placeholder.
+// files. An unknown __NAME__ is an error, so a typo never sends a literal
+// placeholder. Two helpers are defined for the program:
+//   pub(value)  marks a returned value as public, so it is printed
+//   fp(value)   { len, fp } of a value, already public (the sandbox has no crypto)
 //
-// Output masks the value of every NAME=value line (env blocks), whatever the
-// name, up to the end of the line; --show lists the names whose values may be
-// printed. It also masks every value from --secrets, user:pass@ in URLs, and
-// "name": "value" pairs whose name looks secret.
+// Output is deny by default. Every string and number in the program's result
+// and in an approval's input prints as <redacted:N> (N = length) unless:
+//   - the program wrapped it in pub(), or
+//   - its object key, or its env name in a NAME=value / NAME: value line, is
+//     listed in --show.
+// Env-like strings print one line per entry as NAME=<redacted:N>, so an
+// approval shows which names it sets. Object keys, booleans and the response
+// envelope (status, requestId, tool, outcomes) print as they are, and so does
+// the identifier in a {name|key, value} pair. Error messages and other free
+// text print with every --secrets value masked and, in each line, everything
+// after the first "=" or ":" masked.
 //
 // Connection: EXECUTOR_MCP_URL and EXECUTOR_MCP_AUTH, else the "executor"
 // server in ~/.pi/agent/mcp.json (a header starting with "!" runs as a shell
@@ -31,9 +40,7 @@ const die = (msg) => {
 };
 
 // ---------------------------------------------------------------------------
-// Secrets and redaction
-
-const MASK = "<redacted>";
+// Secrets files
 
 const readEnvFiles = (files) => {
 	const values = {};
@@ -49,98 +56,180 @@ const readEnvFiles = (files) => {
 	return values;
 };
 
-// JSON-escaped spellings of a value, as it may appear inside a response.
-const spellings = (v) => {
-	const json = JSON.stringify(v).slice(1, -1);
-	const ascii = json.replace(/[^\x20-\x7e]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
-	return [...new Set([v, json, ascii])];
-};
+// ---------------------------------------------------------------------------
+// Redaction: deny by default
 
-// NAME=value at the start of a line; the value runs to the end of the line,
-// spaces and quotes included. Applied to real text: JSON responses are parsed
-// and each string is redacted after unescaping.
-const ENV_LINE = /(^|\n)([A-Z][A-Z0-9_]*)=([^\n]*)/g;
-// Same, for text that is not JSON but carries escaped newlines (error messages).
-const ENV_LINE_ESCAPED = /(\\n)([A-Z][A-Z0-9_]*)=((?:\\[^n]|[^\\\n])*)/g;
-const URL_CREDENTIALS = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi;
-const SECRET_KEY_NAME = /(key|secret|pass|token|credential|private|auth|dsn|salt|sign|cookie|session|jwt|cert)/i;
-
-const makeRedactor = (secrets, show = new Set()) => {
-	const needles = Object.values(secrets)
-		.filter((v) => v.length >= 4)
-		.flatMap(spellings)
-		.sort((a, b) => b.length - a.length);
-	const text = (t) => {
-		let s = t;
-		for (const n of needles) s = s.split(n).join(MASK);
-		const mask = (m, pre, name, value) => (show.has(name) || value === "" ? m : `${pre}${name}=${MASK}`);
-		s = s.replace(ENV_LINE, mask).replace(ENV_LINE_ESCAPED, mask);
-		return s.replace(URL_CREDENTIALS, `$1${MASK}@`);
-	};
-	const walk = (v, key) => {
-		if (typeof v === "string") return key && SECRET_KEY_NAME.test(key) && !show.has(key) ? MASK : text(v);
-		if (Array.isArray(v)) return v.map((x) => walk(x));
-		if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [text(k), walk(x, k)]));
-		return v;
-	};
-	return (out) => {
-		try {
-			return JSON.stringify(walk(JSON.parse(out)), null, 1);
-		} catch {
-			return text(out);
-		}
-	};
-};
-
-const FP_SOURCE = `const fp = (v) => { let h = 0; for (const c of String(v)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return { len: String(v).length, fp: h }; };`;
+const PUBLIC = "__executorPipePublic";
+const PROGRAM_HELPERS = [
+	`const pub = (v) => ({ ${PUBLIC}: v });`,
+	`const fp = (v) => { let h = 0; for (const c of String(v)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return pub({ len: String(v).length, fp: h }); };`,
+].join("\n");
 const fp = (v) => {
 	let h = 0;
 	for (const c of String(v)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
 	return { len: String(v).length, fp: h };
 };
 
+const hidden = (v) => `<redacted:${String(v).length}>`;
+
+// "NAME=value", "export NAME=value", "NAME: value", with any indentation.
+const ENTRY = /^\s*(?:export\s+)?([^\s=:]+)\s*[=:]/;
+
+// JSON-escaped spellings of a value, as it may appear in an error message.
+const spellings = (v) => {
+	const json = JSON.stringify(v).slice(1, -1);
+	const ascii = json.replace(/[^\x20-\x7e]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`);
+	return [...new Set([v, json, ascii])];
+};
+
+const makeRedactor = (secrets, show = new Set()) => {
+	const needles = Object.values(secrets)
+		.filter((v) => v.length >= 4)
+		.flatMap(spellings)
+		.sort((a, b) => b.length - a.length);
+	const scrub = (t) => {
+		let s = String(t);
+		for (const n of needles) s = s.split(n).join("<redacted>");
+		return s;
+	};
+
+	// A string with several lines, or one entry, renders as its entry names.
+	const maskString = (v, key) => {
+		if (key !== undefined && show.has(key) && !v.includes("\n")) return scrub(v);
+		const lines = v.split(/\r?\n/);
+		const entries = lines.map((l) => ENTRY.exec(l));
+		if (entries.some(Boolean)) {
+			return lines
+				.map((l, i) => {
+					const m = entries[i];
+					if (!m) return l.trim() === "" ? l : hidden(l);
+					const value = l.slice(m[0].length);
+					const single = !/\s\S+\s*[=:]/.test(value.trim());
+					return show.has(m[1]) && single ? scrub(l) : `${m[0]}${hidden(value.trim())}`;
+				})
+				.join("\n");
+		}
+		return hidden(v);
+	};
+
+	const mask = (v, key, revealed = false) => {
+		if (v === null || typeof v === "boolean") return v;
+		if (typeof v === "number") return revealed || (key !== undefined && show.has(key)) ? v : hidden(v);
+		if (typeof v === "string") return revealed ? scrub(v) : maskString(v, key);
+		if (Array.isArray(v)) return v.map((x) => mask(x, undefined, revealed));
+		if (typeof v === "object") {
+			if (PUBLIC in v && Object.keys(v).length === 1) return mask(v[PUBLIC], key, true);
+			// {name|key: X, value: Y} pairs (Vercel, ECS, Kubernetes): show by X.
+			const pairName = typeof v.name === "string" ? v.name : typeof v.key === "string" ? v.key : undefined;
+			return Object.fromEntries(
+				Object.entries(v).map(([k, x]) => {
+					// The pair's name is an identifier, not data: print it so an approval
+					// shows which variable it sets.
+					const isPairName = "value" in v && (k === "name" || k === "key") && /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(String(x));
+					const shown =
+						revealed || isPairName || show.has(k) || (k === "value" && pairName !== undefined && show.has(pairName));
+					return [scrub(k), mask(x, k, shown)];
+				}),
+			);
+		}
+		return hidden(String(v));
+	};
+
+	// Free text (errors, non-JSON replies): masked secrets, then in every line
+	// everything after the first "=" or ":" unless that entry is shown.
+	const maskText = (t) =>
+		scrub(t)
+			.split(/\r?\n|\\n/)
+			.map((l) => {
+				const m = ENTRY.exec(l);
+				if (m && show.has(m[1]) && !/\s\S+\s*[=:]/.test(l.slice(m[0].length).trim())) return l;
+				const cut = l.search(/[=:]/);
+				return cut === -1 ? l : `${l.slice(0, cut + 1)} <redacted>`;
+			})
+			.join("\n");
+
+	return { mask, maskText, scrub };
+};
+
+// The envelope keeps only fields that never carry call data.
+const render = (result, redactor) => {
+	const { mask, maskText } = redactor;
+	let p = result?.structuredContent ?? result?.content?.map((c) => c.text).join("\n") ?? result;
+	if (typeof p === "string") {
+		try {
+			p = JSON.parse(p);
+		} catch {
+			return maskText(p);
+		}
+	}
+	if (p?.status === "approval-required" || p?.status === "input-required") {
+		return { status: p.status, requestId: p.requestId, tool: p.invocation?.tool, input: mask(p.invocation?.input) };
+	}
+	const e = p?.execution;
+	if (e) {
+		return {
+			status: p.status,
+			ok: e.ok,
+			...(e.ok ? { value: mask(e.value) } : { error: { kind: e.error?.kind, message: maskText(e.error?.message ?? "") } }),
+			toolCalls: (e.toolCalls ?? []).map((c) => ({ name: c.name, outcome: c.outcome })),
+		};
+	}
+	return { status: p?.status, response: mask(p) };
+};
+
 // Runs before every network call: a redactor that leaks is worse than none.
-// Cases come from review: quoted values, spaces, names that do not look
-// secret, credentials inside URLs, non-ASCII values escaped as \uXXXX.
+// Each shape below leaked in an earlier version or in review.
 const selftest = () => {
-	const fake = { FAKE_TOKEN: "fake-token-value", SHORT: "abcd", ACCENT: "contraseña-falsa" };
-	const redact = makeRedactor(fake, new Set(["PUBLIC_NAME"]));
-	const env = [
+	const S = "Zq9fakeSECRETzq";
+	const redactor = makeRedactor({ FAKE: "fake-file-secret" }, new Set(["PUBLIC_NAME", "bucket", "applicationId"]));
+	const envBlock = [
 		"PUBLIC_NAME=visible-value",
-		'DB_PASSWORD="quoted secret value"',
-		"SECRET_KEY=has space inside",
-		"DATABASE_URL=postgres://dbuser:dbpass-fake@db:5432/app",
-		"SENTRY_DSN=https://fakedsnkey@sentry.example/1",
-		"SESSION_SALT=salty-fake-salt",
-		"JWT=eyJfake.jwt.value",
+		`DB_PASSWORD="quoted ${S}"`,
+		`export EXPORTED=${S}`,
+		`  INDENTED=${S}`,
+		`yaml_key: ${S}`,
+		`SPACED = ${S}`,
+		`lower_name=${S}`,
+		`CONTRASEÑA=${S}`,
+		`DATABASE_URL=redis://:${S}@h`,
 		"EMPTY=",
 	].join("\n");
-	const sample = JSON.stringify({
-		env,
-		nested: { apiKey: "fake-api-key-value", sentryDsn: "fake-dsn-value", note: "uses fake-token-value and abcd" },
-		url: "see https://someuser:fake-url-pass@host.example/path",
-	});
-	const escaped = JSON.stringify({ v: "x contraseña-falsa y" }).replace(/ñ/g, "\\u00f1"); // parsed back to ñ
-	const errorText = 'Error: bad env "A=1\\nDB_PASSWORD=\\"quoted secret value\\"\\nB=2"';
-	const out = `${redact(sample)}\n${redact(escaped)}\n${redact(env)}\n${redact(errorText)}`;
-	const leaks = [
-		"quoted secret value",
-		"space inside",
-		"dbpass-fake",
-		"fakedsnkey",
-		"salty-fake-salt",
-		"eyJfake",
-		"fake-api-key-value",
-		"fake-dsn-value",
-		"fake-token-value",
-		"abcd",
-		"fake-url-pass",
-		"someuser",
-		"contrase",
-	].filter((v) => out.includes(v));
-	const kept = ["PUBLIC_NAME=visible-value", "EMPTY=", "DB_PASSWORD=", "DATABASE_URL="].filter((v) => !out.includes(v));
+	const input = {
+		applicationId: "app-visible-id",
+		env: envBlock,
+		STRIPE_SK: S,
+		REDIS_URL: `redis://:${S}@h`,
+		vars: [
+			{ name: "DB_PASSWORD", value: S },
+			{ key: "bucket", value: "visible-bucket" },
+			{ name: "bucket", value: "visible-bucket-2" },
+		],
+		token: { nested: S },
+		apiKeys: [S],
+		pin: 1234,
+		header: `Authorization: Bearer ${S}`,
+		url: `https://h/x?api_key=${S}`,
+		multi: `KEY="line one ${S}\nline two ${S}"`,
+		fromFile: "fake-file-secret",
+		docker: `docker run -e DB_PASSWORD=${S} img`,
+		sameLine: `PUBLIC_NAME=ok DB_PASSWORD=${S}`,
+		keyValue: [{ key: "STRIPE_SK", value: S }],
+		"contraseña": S,
+		start: `${S}\nsecond line`,
+		public: { [PUBLIC]: { names: ["DB_PASSWORD"], fp: { len: 3, fp: 9 } } },
+	};
+	const out = [
+		JSON.stringify(render({ structuredContent: { status: "approval-required", requestId: "r1", invocation: { tool: "t", input } } }, redactor)),
+		JSON.stringify(render({ structuredContent: { status: "completed", execution: { ok: true, value: input, toolCalls: [] } } }, redactor)),
+		JSON.stringify(render({ structuredContent: { status: "completed", execution: { ok: false, error: { kind: "X", message: `bad "A=1\\nDB_PASSWORD=${S}\\nfake-file-secret"` } } } }, redactor)),
+		render({ content: [{ text: `not json: export X=${S}\nfake-file-secret` }] }, redactor),
+	].join("\n");
+	const leaks = [S, "fake-file-secret", "1234"].filter((v) => out.includes(v));
+	const kept = ["visible-value", "app-visible-id", "visible-bucket", "visible-bucket-2", '"name":"DB_PASSWORD"', '"key":"STRIPE_SK"', "EXPORTED", "yaml_key", "CONTRASEÑA", '"names"'].filter(
+		(v) => !out.includes(v),
+	);
 	if (leaks.length || kept.length) {
-		die(`redaction self-test failed (leaks: ${leaks.join(", ") || "none"}; lost: ${kept.join(", ") || "none"})`);
+		die(`redaction self-test failed (leaks: ${leaks.length}; lost: ${kept.join(", ") || "none"})`);
 	}
 	return out;
 };
@@ -206,28 +295,6 @@ const mcp = async (calls) => {
 	return rpc({ jsonrpc: "2.0", id: 1, method: "tools/call", params: calls });
 };
 
-// Approvals and input requests echo the whole call input: keep what the user
-// needs to decide (tool and redacted input) and drop the rest.
-const summarize = (result) => {
-	const payload = result?.structuredContent ?? result?.content?.map((c) => c.text).join("\n") ?? result;
-	let p = payload;
-	if (typeof p === "string") {
-		try {
-			p = JSON.parse(p);
-		} catch {
-			return p;
-		}
-	}
-	if (p?.status === "approval-required" || p?.status === "input-required") {
-		return JSON.stringify(
-			{ status: p.status, requestId: p.requestId, tool: p.invocation?.tool, input: p.invocation?.input },
-			null,
-			1,
-		);
-	}
-	return JSON.stringify(p);
-};
-
 // ---------------------------------------------------------------------------
 // Commands
 
@@ -249,7 +316,7 @@ if (!cmd || cmd === "-h" || cmd === "--help") {
 }
 
 if (cmd === "selftest") {
-	console.log(selftest());
+	selftest();
 	console.log("redaction self-test: ok");
 	process.exit(0);
 }
@@ -265,11 +332,11 @@ if (cmd === "fp") {
 
 selftest();
 const secrets = readEnvFiles(secretFiles);
-const redact = makeRedactor(secrets, show);
+const redactor = makeRedactor(secrets, show);
 let call;
 if (cmd === "run") {
 	const [file] = pos;
-	if (!file) die("usage: executor-pipe run <program.js> [--secrets <file.env>]...");
+	if (!file) die("usage: executor-pipe run <program.js> [--secrets <file.env>]... [--show NAME,...]");
 	const missing = new Set();
 	const code = readFileSync(file, "utf8").replace(/__([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)__/g, (m, name) => {
 		if (name in secrets) return JSON.stringify(secrets[name]);
@@ -277,11 +344,11 @@ if (cmd === "run") {
 		return m;
 	});
 	if (missing.size) die(`not in the secrets files: ${[...missing].join(", ")}`);
-	call = { name: "execute", arguments: { code: `${FP_SOURCE}\n${code}` } };
+	call = { name: "execute", arguments: { code: `${PROGRAM_HELPERS}\n${code}` } };
 } else if (cmd === "resume") {
 	const [requestId, action] = pos;
 	if (!requestId || !["accept", "decline", "cancel"].includes(action)) {
-		die("usage: executor-pipe resume <requestId> accept|decline|cancel [--secrets <file.env>]...");
+		die("usage: executor-pipe resume <requestId> accept|decline|cancel [--secrets <file.env>]... [--show NAME,...]");
 	}
 	call = {
 		name: "resume",
@@ -292,4 +359,7 @@ if (cmd === "run") {
 }
 
 const out = await mcp(call);
-console.log(redact(out.error ? JSON.stringify(out.error) : summarize(out.result)));
+const printed = out.error
+	? { error: redactor.maskText(JSON.stringify(out.error)) }
+	: render(out.result, redactor);
+console.log(redactor.scrub(typeof printed === "string" ? printed : JSON.stringify(printed, null, 1)));
